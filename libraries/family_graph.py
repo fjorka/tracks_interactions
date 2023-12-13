@@ -111,7 +111,7 @@ def render_tree_view(plot_view,t,viewer):
     y_max = 1
 
     # render the tree
-    t_rendering = t.render('')
+    t_rendering = t.render('.')
 
     # add position of y to the rendering
     t = add_y_rendering(t,t_rendering)
