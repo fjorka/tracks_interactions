@@ -37,7 +37,9 @@ def add_children(node, df, n=2):
         
         n += 1
         
-        add_children(child_node, df, n+1)
+        n = add_children(child_node, df, n)
+
+    return n
 
 def build_Newick_tree(engine, root_id):
     
@@ -84,7 +86,7 @@ def add_y_rendering(t,t_rendering):
     Helpful while generating vertical lines.
     '''
 
-    for n in t.traverse():
+    for n in t.traverse(strategy='preorder'):
 
         if n.is_root():
             pass
