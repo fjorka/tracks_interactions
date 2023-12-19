@@ -9,6 +9,10 @@ from ete3 import Tree
 
 import pyqtgraph as pg
 
+global viewer
+global engine
+global plot_widget
+
 
 def add_children(node, df, n=2):
 
@@ -160,3 +164,55 @@ def render_tree_view(plot_view,t,viewer):
     plot_view.setYRange(0, 1.1*y_max)
 
     return plot_view
+
+def build_lineage_widget(t_max):
+
+    '''
+    Builds pyqt widget to display lineage tree.
+    '''
+    
+    global plot_widget
+
+    plot_widget = pg.GraphicsLayoutWidget()
+    plot_view = plot_widget.addPlot(title="Lineage tree", labels={"bottom": "Time"})
+    plot_view.hideAxis("left")
+    plot_view.setXRange(0, t_max)
+
+    return plot_widget
+
+def update_lineage_display(event):
+
+    global plot_widget # it may be possible to extract from napari, at the moment a global thing
+    #global viewer
+    #global time_line
+    
+    # clear the widget
+    plot_view = plot_widget.getItem(0,0)
+    plot_view.clear()
+
+    # get fan active label
+    active_label = int(viewer.layers['Labels'].selected_label)
+
+    # check if the label is in the database
+    with Session(engine) as session:
+        
+        query = session.query(TrackDB).filter(TrackDB.track_id == active_label).first()
+
+    # actions based on finding the label in the database
+    if query is not None:
+
+        # get the root value
+        root = query.root
+
+        # update viewer status
+        viewer.status = f'Family of track number {root}.'
+
+        # buid the tree
+        tree = build_Newick_tree(engine, root)
+
+        # update the widget with the tree
+        plot_view = render_tree_view(plot_view,tree,viewer)
+
+        
+    else:
+        viewer.status = 'Error - no such label in the database.'
