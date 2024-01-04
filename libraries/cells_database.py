@@ -51,7 +51,6 @@ class CellDB(Base):
     def __repr__(self):
         return f"{self.id} from frame {self.t} with track_id {self.track_id} at ({self.row},{self.col})"
 
-
 class TrackDB(Base):
 
     __tablename__ = 'tracks'
@@ -113,6 +112,7 @@ def _fast_forest_transverse(
 
 
 def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
+
     """Adds `track_id` and `parent_track_id` columns to forest `df`.
     Each maximal path receveis a unique `track_id`.
 
@@ -150,3 +150,4 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     ), f"Something went wrong. Found unlabeled tracks\n{df[unlabeled_tracks]}"
 
     return df
+
