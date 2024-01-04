@@ -190,7 +190,7 @@ def update_lineage_display(event):
     plot_view = plot_widget.getItem(0,0)
     plot_view.clear()
 
-    # get fan active label
+    # get an active label
     active_label = int(viewer.layers['Labels'].selected_label)
 
     # check if the label is in the database
