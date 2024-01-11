@@ -1,25 +1,17 @@
-import sqlalchemy as sqla
-from sqlalchemy import Column, ForeignKey, event
-
-from sqlalchemy import (
-    BigInteger,
-    Float,
-    Integer,
-    PickleType,
-)
-
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm.session import Session
-
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-from numba import njit, typed, types
-from numpy.typing import ArrayLike
-
-from ultrack.core.database import NO_PARENT
-from ultrack.tracks.graph import create_tracks_forest, _fast_path_transverse
+from numba import njit
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    ForeignKey,
+    Integer,
+    PickleType,
+)
+from sqlalchemy.orm import declarative_base
+from ultrack.tracks.graph import _fast_path_transverse, create_tracks_forest
 
 # constant value to indicate it has no parent
 NO_PARENT = -1
@@ -31,7 +23,7 @@ Base = declarative_base()
 class CellDB(Base):
     __tablename__ = "cells"
 
-    track_id = Column(Integer, ForeignKey('tracks.track_id'), primary_key=True)
+    track_id = Column(Integer, ForeignKey("tracks.track_id"), primary_key=True)
     t = Column(Integer, primary_key=True)
 
     id = Column(BigInteger, unique=True)
@@ -52,7 +44,7 @@ class CellDB(Base):
 
 
 class TrackDB(Base):
-    __tablename__ = 'tracks'
+    __tablename__ = "tracks"
 
     track_id = Column(Integer, primary_key=True)
     parent_track_id = Column(Integer)
@@ -146,7 +138,7 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[paths, "track_id"] = np.repeat(track_ids, lengths)
     df.loc[paths, "parent_track_id"] = np.repeat(parent_track_ids, lengths)
     df.loc[paths, "root"] = df.loc[
-        np.repeat(roots_list, lengths), 'track_id'
+        np.repeat(roots_list, lengths), "track_id"
     ].tolist()
 
     unlabeled_tracks = df["track_id"] == NO_PARENT
