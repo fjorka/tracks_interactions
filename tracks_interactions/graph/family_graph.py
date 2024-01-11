@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from ete3 import Tree
-from sqlalchemy.orm import Session, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from napari import Viewer
 from tracks_interactions.db.db_model import TrackDB
