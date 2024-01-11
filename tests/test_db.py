@@ -2,8 +2,12 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from tracks_interactions.db.cells_database import NO_PARENT, Base, TrackDB
-from tracks_interactions.db.track_module import get_descendants, modify_trackDB
+from tracks_interactions.db.db_functions import (
+    get_descendants,
+    modify_trackDB,
+    newTrack_number,
+)
+from tracks_interactions.db.db_model import NO_PARENT, Base, TrackDB
 
 
 @pytest.fixture(scope="function")
@@ -57,6 +61,27 @@ def test_adding_track(db_session):
 
     # Verify the record was added
     assert db_session.query(TrackDB).filter_by(track_id=100).one()
+
+
+def test_newTrack_number(db_session):
+    """Test - getting a new track number."""
+
+    new_track = newTrack_number(db_session)
+    assert new_track == 5
+
+    new_track_number = 600
+    new_track = TrackDB(
+        track_id=new_track_number,
+        parent_track_id=None,
+        root=0,
+        t_begin=0,
+        t_end=10,
+    )
+    db_session.add(new_track)
+    db_session.commit()
+
+    new_track = newTrack_number(db_session)
+    assert new_track == new_track_number + 1
 
 
 def test_get_descendants(db_session):

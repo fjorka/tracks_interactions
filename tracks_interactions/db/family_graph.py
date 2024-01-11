@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from cells_database import TrackDB
 from ete3 import Tree
 from sqlalchemy.orm import Session, create_engine
 
 from napari import Viewer
+from tracks_interactions.db.db_model import TrackDB
 
 viewer = Viewer()
 engine = create_engine("sqlite:///:memory:")

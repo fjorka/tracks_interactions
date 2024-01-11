@@ -1,7 +1,7 @@
 from sqlalchemy import and_
 from sqlalchemy.orm import Session, aliased
 
-from tracks_interactions.db.cells_database import CellDB, TrackDB
+from tracks_interactions.db.db_model import CellDB, TrackDB
 
 
 def newTrack_number(engine):
