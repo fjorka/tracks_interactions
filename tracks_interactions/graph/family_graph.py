@@ -6,12 +6,6 @@ from sqlalchemy.orm import Session
 
 from tracks_interactions.db.db_model import TrackDB
 
-# viewer = Viewer()
-# engine = create_engine("sqlite:///:memory:")
-# plot_widget
-viewer = 0
-engine = 0
-
 
 def _add_children(node, df, n=2):
     """
@@ -46,6 +40,8 @@ def _add_y_rendering(t, t_rendering):
     Helper function for rendering of a tree.
     For convenience to keep y values in the tree.
     Helpful while generating vertical lines.
+    t -
+    t_rendering -
     """
 
     for n in t.traverse(strategy="preorder"):
@@ -178,14 +174,11 @@ def build_lineage_widget(t_max):
     return plot_widget
 
 
-def update_lineage_display(event):
+def update_lineage_display(viewer, plot_widget, engine):
     """
-    This function is called when the user selects a label in the napari viewer.
+    This function is called by the even handler
+    when the user selects a label in the napari viewer.
     """
-
-    global plot_widget  # it may be possible to extract from napari, at the moment a global thing
-    # global viewer
-    # global time_line
 
     # clear the widget
     plot_view = plot_widget.getItem(0, 0)
