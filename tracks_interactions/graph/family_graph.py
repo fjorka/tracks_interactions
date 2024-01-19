@@ -2,18 +2,18 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from ete3 import Tree
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from napari import Viewer
 from tracks_interactions.db.db_model import TrackDB
 
-viewer = Viewer()
-engine = create_engine("sqlite:///:memory:")
+# viewer = Viewer()
+# engine = create_engine("sqlite:///:memory:")
 # plot_widget
+viewer = 0
+engine = 0
 
 
-def add_children(node, df, n=2):
+def _add_children(node, df, n=2):
     """
     Helper function for build_Newick_tree
     Recursively adds children to the tree from a dataframe.
@@ -36,9 +36,31 @@ def add_children(node, df, n=2):
 
         n += 1
 
-        n = add_children(child_node, df, n)
+        n = _add_children(child_node, df, n)
 
     return n
+
+
+def _add_y_rendering(t, t_rendering):
+    """
+    Helper function for rendering of a tree.
+    For convenience to keep y values in the tree.
+    Helpful while generating vertical lines.
+    """
+
+    for n in t.traverse(strategy="preorder"):
+        if n.is_root():
+            pass
+        else:
+            y = np.mean(
+                [
+                    t_rendering["node_areas"][n.num][1],
+                    t_rendering["node_areas"][n.num][3],
+                ]
+            )
+            n.add_feature("y", y)
+
+    return t
 
 
 def build_Newick_tree(engine, root_id):
@@ -72,32 +94,10 @@ def build_Newick_tree(engine, root_id):
     )
 
     # add children
-    add_children(trunk, df)
+    _add_children(trunk, df)
 
     # return tree
     return tree
-
-
-def add_y_rendering(t, t_rendering):
-    """
-    Helper function for rendering of a tree.
-    For convenience to keep y values in the tree.
-    Helpful while generating vertical lines.
-    """
-
-    for n in t.traverse(strategy="preorder"):
-        if n.is_root():
-            pass
-        else:
-            y = np.mean(
-                [
-                    t_rendering["node_areas"][n.num][1],
-                    t_rendering["node_areas"][n.num][3],
-                ]
-            )
-            n.add_feature("y", y)
-
-    return t
 
 
 def render_tree_view(plot_view, t, viewer):
@@ -118,7 +118,7 @@ def render_tree_view(plot_view, t, viewer):
     t_rendering = t.render(".")
 
     # add position of y to the rendering
-    t = add_y_rendering(t, t_rendering)
+    t = _add_y_rendering(t, t_rendering)
 
     for n in t.traverse():
         if n.is_root():
@@ -179,6 +179,10 @@ def build_lineage_widget(t_max):
 
 
 def update_lineage_display(event):
+    """
+    This function is called when the user selects a label in the napari viewer.
+    """
+
     global plot_widget  # it may be possible to extract from napari, at the moment a global thing
     # global viewer
     # global time_line
