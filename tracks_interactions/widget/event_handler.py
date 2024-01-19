@@ -8,5 +8,5 @@ class EventHandler:
         self.engine = engine
 
     def lineage_update(self, event):
-        # update the plot_widget
+        """update the plot_widget"""
         update_lineage_display(self.viewer, self.plot_widget, self.engine)
