@@ -60,9 +60,7 @@ def get_descendants(session, active_label):
     return descendants
 
 
-def modify_trackDB(
-    session, descendants, active_label, current_frame, new_track
-):
+def cut_trackDB(session, descendants, active_label, current_frame, new_track):
     """
     Function to modify track_id for a given label and all its descendants.
     input:
@@ -101,6 +99,7 @@ def modify_trackDB(
     else:
         # indicate that the track is now first in the family
         record.parent_track_id = -1
+        record.root = active_label
 
         # there will be no new_track entry added
         new_track = active_label
@@ -113,6 +112,7 @@ def modify_trackDB(
         # change the value of the root track
         record.root = new_track
 
+        # change for children
         if record.parent_track_id == active_label:
             # indicate that the track is now first in the family
             record.parent_track_id = new_track

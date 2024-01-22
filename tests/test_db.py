@@ -3,8 +3,9 @@ from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
 from tracks_interactions.db.db_functions import (
+    cut_cellsDB,
+    cut_trackDB,
     get_descendants,
-    modify_trackDB,
     newTrack_number,
 )
 from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
@@ -12,10 +13,11 @@ from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
 
 @pytest.fixture(scope="function")
 def db_session():
+    # see "./tests/fixtures/test_database_content.PNG" for a visual representation of copied part of the test database
     test_db_path = r"./tests/fixtures/db_2tables_test.db"
     original_engine = create_engine(f"sqlite:///{test_db_path}")
-    original_metadata = MetaData(bind=original_engine)
-    original_metadata.reflect()
+    original_metadata = MetaData()
+    original_metadata.reflect(bind=original_engine)
 
     # Create an in-memory SQLite database
     memory_engine = create_engine("sqlite:///:memory:")
@@ -146,7 +148,7 @@ def test_get_descendants(db_session):
     assert descendants_list == [3, 4]
 
 
-def test_modify_track(db_session):
+def test_cut_trackDB(db_session):
     """Test checking that a track is modified correctly."""
 
     active_label = 1
@@ -155,7 +157,7 @@ def test_modify_track(db_session):
     current_frame = 5
     new_track = 100
 
-    modify_trackDB(
+    cut_trackDB(
         db_session, descendants, active_label, current_frame, new_track
     )
 
@@ -191,4 +193,111 @@ def test_modify_track(db_session):
     assert (
         db_session.query(TrackDB).filter_by(track_id=4).one().parent_track_id
         == 3
+    )
+
+
+def test_cut_trackDB_mitosis(db_session):
+    """Test checking that a track is modified correctly."""
+
+    active_label = 17175
+    descendants = get_descendants(db_session, active_label)
+
+    t_begin_org = (
+        db_session.query(TrackDB)
+        .filter_by(track_id=active_label)
+        .one()
+        .t_begin
+    )
+    t_end_org = (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
+    )
+    new_track = 100
+
+    cut_trackDB(db_session, descendants, active_label, t_begin_org, new_track)
+
+    # assert that the active label track is in the database
+    assert db_session.query(TrackDB).filter_by(track_id=active_label).one()
+
+    # assert that the new track has expected properties
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=active_label)
+        .one()
+        .t_begin
+        == t_begin_org
+    )
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
+        == t_end_org
+    )
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=active_label)
+        .one()
+        .parent_track_id
+        == -1
+    )
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().root
+        == active_label
+    )
+
+    # assert that the new track was not created
+    assert (
+        len(db_session.query(TrackDB).filter_by(track_id=new_track).all()) == 0
+    )
+
+
+def test_cut_cellsDB(db_session):
+    """Test checking whether the cut_cellsDB function works correctly."""
+
+    active_label = 15854
+
+    # check how long the track is before the cut
+    org_stop = (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
+    )
+
+    descendants = get_descendants(db_session, active_label)
+
+    current_frame = 5
+    new_track = 100
+
+    _ = cut_cellsDB(
+        db_session, descendants, active_label, current_frame, new_track
+    )
+
+    # assert that there are only 5 objects in the cell table after cut
+    assert (
+        len(db_session.query(CellDB).filter_by(track_id=active_label).all())
+        == current_frame
+    )
+
+    # assert that there is expected number of objects in new track
+    assert len(
+        db_session.query(CellDB).filter_by(track_id=new_track).all()
+    ) == (org_stop - current_frame + 1)
+
+    # assert that the first object in a new track doesn't have a parent
+    assert (
+        db_session.query(CellDB)
+        .filter_by(track_id=new_track)
+        .filter(CellDB.t == current_frame)
+        .one()
+        .parent_id
+        == -1
+    )
+
+    # assert that parents are not changed on the original track
+    assert (
+        db_session.query(CellDB)
+        .filter_by(track_id=active_label)
+        .filter(CellDB.t == current_frame - 1)
+        .one()
+        .parent_id
+        == db_session.query(CellDB)
+        .filter_by(track_id=active_label)
+        .filter(CellDB.t == current_frame - 2)
+        .one()
+        .id
     )
