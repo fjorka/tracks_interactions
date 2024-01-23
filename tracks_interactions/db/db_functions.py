@@ -38,7 +38,7 @@ def get_descendants(session, active_label):
         session
         active_label - label for which we want to get descendants
     output:
-        descendants - list of descendants as row objects
+        descendants - list of descendants as row objects (not modifyable)
     """
 
     cte = (
@@ -55,72 +55,129 @@ def get_descendants(session, active_label):
         )
     )
 
-    descendants = session.query(cte).all()
+    # Join the CTE with TrackDB to get full TrackDB objects
+    descendants = (
+        session.query(TrackDB)
+        .join(cte, TrackDB.track_id == cte.c.track_id)
+        .all()
+    )
 
     return descendants
 
 
-def cut_trackDB(session, descendants, active_label, current_frame, new_track):
+def cut_trackDB(session, active_label, current_frame):
     """
-    Function to modify track_id for a given label and all its descendants.
+    Function to cut a track in trackDB.
     input:
         session
-        descendants - descendants always starting with the active_label itself
-        active_label - label for which we want to get descendants
-        current_frame - time point of a cut
+        active_label - label for which the track is cut
+        current_frame - current time point
     output:
-        None
+        mitosis - True if the track is cut from mitosis
+        new_track - number of the new track if the track is cut in the middle
     """
 
     # get the acual track and check what will be done
-    record = (
-        session.query(TrackDB)
-        .filter_by(track_id=descendants[0].track_id)
-        .first()
-    )
+    record = session.query(TrackDB).filter_by(track_id=active_label).first()
 
-    # when a track is truly cut
-    if record.t_begin < current_frame:
-        # add completely new track to start the new family
+    # by accident cut on the first object of a track
+    if (record.parent_track_id == -1) and (record.t_begin == current_frame):
+        new_track = None
+        mitosis = False
+
+    # cutting from mitosis
+    elif (record.parent_track_id > -1) and (record.t_begin == current_frame):
+        record.parent_track_id = -1
+
+        # process descendants
+        descendants = get_descendants(session, active_label)
+
+        for track in descendants:
+            track.root = active_label
+
+        # indicate no new track
+        new_track = None
+        mitosis = True
+
+        session.commit()
+
+    # there is a true cut
+    elif record.t_begin < current_frame:
+        # modify the end of the track
+        org_t_end = record.t_end
+        record.t_end = current_frame - 1
+
+        # add completely new track
+        new_track = newTrack_number(session)
+
         track = TrackDB(
             track_id=new_track,
             parent_track_id=-1,
             root=new_track,
             t_begin=current_frame,
-            t_end=record.t_end,
+            t_end=org_t_end,
         )
 
         session.add(track)
 
-        # modify the end of the track
-        record.t_end = current_frame - 1
+        # process descendants
+        descendants = get_descendants(session, active_label)
 
-    # if just deataching from mitosis or by accident clicked on the first label that is unconnected
+        for track in descendants[1:]:
+            # change the value of the root track
+            track.root = new_track
+
+            # change for children
+            if track.parent_track_id == active_label:
+                track.parent_track_id = new_track
+
+        mitosis = False
+        session.commit()
+
     else:
-        # indicate that the track is now first in the family
-        record.parent_track_id = -1
-        record.root = active_label
+        raise ValueError("Track situation unaccounted for")
 
-        # there will be no new_track entry added
-        new_track = active_label
-
-    # changes for true descendants
-    for tr in descendants[1:]:
-        # Fetch the actual record from the database
-        record = session.query(TrackDB).filter_by(track_id=tr.track_id).first()
-
-        # change the value of the root track
-        record.root = new_track
-
-        # change for children
-        if record.parent_track_id == active_label:
-            # indicate that the track is now first in the family
-            record.parent_track_id = new_track
-
-    session.commit()
+    return mitosis, new_track
 
 
-def get_track_bbox(query):
+# def merge_trackDB(session, merger_from, merger_to, current_frame):
+#     """
+#     Function to merge two tracks in trackDB.
+#     """
+
+#     # change the end of the merger to
+#     record = session.query(TrackDB).filter_by(track_id=merger_to).first()
+#     record.t_end = session.query(TrackDB).filter_by(track_id=merger_from).first().t_end
+
+
+#     # check if merger_from is cut or is it a beginning
+#     m_from_begin = session.query(TrackDB).filter_by(track_id=merger_from).first().t_begin
+
+#     # entire m_from is being merget to m_to
+#     if m_from_begin >= current_frame:
+
+#     else:
+
+
+#         # change the root of the merger_to
+#         session.query(TrackDB).filter_by(track_id=merger_from).first().root = merger_to
+
+#         # change the parent_id of the merger_from
+#         session.query(TrackDB).filter_by(track_id=merger_from).first().parent_track_id = -1
+
+#         # change the parent_id of the children
+#         children = session.query(TrackDB).filter_by(parent_track_id=merger_to).all()
+
+#         for child in children:
+#             child.parent_track_id = merger_from
+
+#         # delete merger_to
+#         session.query(TrackDB).filter_by(track_id=merger_to).delete()
+
+#     # check if merger_to is cut or is it the end of the track
+
+
+def _get_track_bbox(query):
     """
     Helper function that returns bounding box of a track.
     It's called by cut_cellsDB function when this database is modified.
@@ -142,14 +199,37 @@ def get_track_bbox(query):
     return (t_stop, row_start, row_stop, column_start, column_stop)
 
 
-def cut_cellsDB(session, descendants, active_label, current_frame, new_track):
+def cut_cellsDB_mitosis(session, active_label):
+    """
+    Function to cut the cell of from mitotic event.
+    input:
+        session
+        active_label - label for which the track is cut
+    output:
+        None
+    """
+
+    cell = (
+        session.query(CellDB)
+        .filter(CellDB.track_id == active_label)
+        .order_by(CellDB.t)
+        .first()
+    )
+
+    assert isinstance(cell, CellDB), "No cells found for the given track"
+
+    cell.parent_id = -1
+
+    session.commit()
+
+
+def cut_cellsDB(session, active_label, current_frame, new_track):
     """
     Function to change track_id in cellsDB.
     To minimize the number of queries returns the bounding box of the track
     and the value for a new track_id.
     input:
         session
-        descendants - list of descendants as row objects
         active_label - label for which the track is cut
         current_frame - current time point
     output:
@@ -172,24 +252,14 @@ def cut_cellsDB(session, descendants, active_label, current_frame, new_track):
     # change the parent id of the first cell
     query[0].parent_id = -1
 
-    # the cell is actually the beginning of the track
-    # only changes to the connections
-    if query[0].t == descendants[0].t_begin:
-        # no need for changing the active track_id
-        new_track = active_label
+    # change track_ids for the cells
+    for cell in query:
+        cell.track_id = new_track
 
-        # there will be no changes in the labels layer
-        track_bbox = None
+    # get the track_bbox
+    track_bbox = _get_track_bbox(query)
 
-    else:
-        # change track_ids for the cells
-        for cell in query:
-            cell.track_id = new_track
-
-        # get the track_bbox
-        track_bbox = get_track_bbox(query)
-
-        session.commit()
+    session.commit()
 
     return track_bbox
 

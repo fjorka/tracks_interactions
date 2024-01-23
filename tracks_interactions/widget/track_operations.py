@@ -12,31 +12,27 @@ def cut_track_function(viewer: Viewer, session):
     # get my label
     active_label = int(viewer.layers["Labels"].selected_label)
 
-    # find new track number
-    new_track = fdb.newTrack_number(session)
-
     ####################################################################################################
     # perform database operations
 
-    # get descendants
-    descendants = fdb.get_descendants(session, active_label)
-
-    # Database operations
-    # cut cellsDB
-    track_bbox = fdb.cut_cellsDB(
-        session, descendants, active_label, current_frame, new_track
-    )
-
     # cut trackDB
-    fdb.modify_trackDB(
-        session, descendants, active_label, current_frame, new_track
-    )
+    mitosis, new_track = fdb.cut_trackDB(session, active_label, current_frame)
 
-    ####################################################################################################
-    # modify labels
-    labels = viewer.layers["Labels"].data
+    # if cutting from mitosis
+    if mitosis:
+        fdb.cut_cellsDB_mitosis(session, active_label)
 
-    if track_bbox is not None:
+        viewer.layers["Labels"].selected_label = active_label
+
+    # if cutting in the middle of a track
+    elif new_track:
+        track_bbox = fdb.cut_cellsDB(
+            session, active_label, current_frame, new_track
+        )
+
+        # modify labels
+        labels = viewer.layers["Labels"].data
+
         sel = labels[
             current_frame : track_bbox[0],
             track_bbox[1] : track_bbox[2],
@@ -51,9 +47,11 @@ def cut_track_function(viewer: Viewer, session):
 
         viewer.layers["Labels"].data = labels
 
-    ####################################################################################################
-    # update lineage graph
-    viewer.layers["Labels"].selected_label = new_track
+        viewer.layers["Labels"].selected_label = new_track
+
+    # if clicked by mistake
+    else:
+        pass
 
     ####################################################################################################
     # change viewer status
