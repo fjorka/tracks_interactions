@@ -80,8 +80,16 @@ def cut_trackDB(session, active_label, current_frame):
     # get the acual track and check what will be done
     record = session.query(TrackDB).filter_by(track_id=active_label).first()
 
-    # by accident cut on the first object of a track
-    if (record.parent_track_id == -1) and (record.t_begin == current_frame):
+    # if cut is called beyond the scope of a track
+    # by accident cut on the first object of a track and it's a starting track
+    if (
+        (record.t_end < current_frame)
+        or (record.t_begin > current_frame)
+        or (
+            (record.parent_track_id == -1)
+            and (record.t_begin == current_frame)
+        )
+    ):
         new_track = None
         mitosis = False
 
@@ -140,41 +148,76 @@ def cut_trackDB(session, active_label, current_frame):
     return mitosis, new_track
 
 
-# def merge_trackDB(session, merger_from, merger_to, current_frame):
-#     """
-#     Function to merge two tracks in trackDB.
-#     """
+def _merge_t2(session, t2, t1, current_frame):
+    """
+    Function to cut a track in trackDB.
+    This function is not touching merge_to
+    input:
+        session
+        active_label - label for which the track is cut
+        current_frame - current time point
+    """
 
-#     # change the end of the merger to
-#     record = session.query(TrackDB).filter_by(track_id=merger_to).first()
-#     record.t_end = session.query(TrackDB).filter_by(track_id=merger_from).first().t_end
+    # if there is remaining part at the beginning
+    if t2.t_begin < current_frame:
+        t2.t_end = current_frame - 1
+
+    # the t2 track in merge stops existing
+    else:
+        session.delete(t2)
+
+    # process descendants
+    descendants = get_descendants(session, t2.track_id)
+
+    for track in descendants[1:]:
+        # change the value of the root track
+        track.root = t1.root
+
+        # change for children
+        if track.parent_track_id == t2.track_id:
+            track.parent_track_id = t1.track_id
+
+    session.commit()
 
 
-#     # check if merger_from is cut or is it a beginning
-#     m_from_begin = session.query(TrackDB).filter_by(track_id=merger_from).first().t_begin
+def merge_trackDB(session, t1_ind, t2_ind, current_frame):
+    """
+    Function to merge two tracks in trackDB.
+    For a merge to happen t1 has to exist on current_frame - 1 time point
+    """
 
-#     # entire m_from is being merget to m_to
-#     if m_from_begin >= current_frame:
+    # get tracks of interest
+    t1 = session.query(TrackDB).filter_by(track_id=t1_ind).first()
+    t2 = session.query(TrackDB).filter_by(track_id=t2_ind).first()
 
-#     else:
+    # if t1 doesn't start yet
+    if t1.t_begin >= current_frame:
+        return -1
 
+    # if t1 is to be cut
+    if (t1.t_begin < current_frame) and (t1.t_end >= current_frame):
+        _, t1_after = cut_trackDB(session, t1.track_id, current_frame)
 
-#         # change the root of the merger_to
-#         session.query(TrackDB).filter_by(track_id=merger_from).first().root = merger_to
+    # if t1 is ending before current_frame
+    elif t1.t_end < current_frame:
+        t1_after = None
 
-#         # change the parent_id of the merger_from
-#         session.query(TrackDB).filter_by(track_id=merger_from).first().parent_track_id = -1
+        # if there is offsprint detach them as separate trees
+        descendants = get_descendants(session, t1.track_id)
 
-#         # change the parent_id of the children
-#         children = session.query(TrackDB).filter_by(parent_track_id=merger_to).all()
+        for track in descendants[1:]:
+            # change for children
+            if track.parent_track_id == t1.track_id:
+                # this route will call descendants twice but I expect it to be rare
+                _, _ = cut_trackDB(session, track.track_id, track.t_begin)
 
-#         for child in children:
-#             child.parent_track_id = merger_from
+    # change t1_before
+    t1.t_end = t2.t_end
 
-#         # delete merger_to
-#         session.query(TrackDB).filter_by(track_id=merger_to).delete()
+    # merge t2 to t1
+    _merge_t2(session, t2, t1, current_frame)
 
-#     # check if merger_to is cut or is it the end of the track
+    return t1_after
 
 
 def _get_track_bbox(query):
@@ -194,9 +237,10 @@ def _get_track_bbox(query):
     row_stop = max(cell.bbox_2 for cell in query)
     column_start = min(cell.bbox_1 for cell in query)
     column_stop = max(cell.bbox_3 for cell in query)
+    t_start = min(cell.t for cell in query)
     t_stop = max(cell.t for cell in query)
 
-    return (t_stop, row_start, row_stop, column_start, column_stop)
+    return (t_start, t_stop, row_start, row_stop, column_start, column_stop)
 
 
 def cut_cellsDB_mitosis(session, active_label):
