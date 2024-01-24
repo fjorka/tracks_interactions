@@ -112,6 +112,9 @@ def merge_track_function(viewer: Viewer, t1: int, session):
         )
         return
 
+    # trigger family tree update
+    viewer.layers["Labels"].selected_label = t1
+
     if t1_after is not None:
         # modify cellsDB of t1
         track_bbox_t1 = fdb.cut_cellsDB(session, t1, current_frame, t1_after)
@@ -124,9 +127,6 @@ def merge_track_function(viewer: Viewer, t1: int, session):
 
     # modify labels of t2
     modify_labels(viewer, track_bbox_t2, t2, t1)
-
-    # trigger family tree update
-    viewer.layers["Labels"].selected_label = t1
 
     ################################################################################################
     # change viewer status

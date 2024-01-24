@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from ete3 import Tree
-from sqlalchemy.orm import Session
 
 from tracks_interactions.db.db_model import TrackDB
 
@@ -59,19 +58,18 @@ def _add_y_rendering(t, t_rendering):
     return t
 
 
-def build_Newick_tree(engine, root_id):
+def build_Newick_tree(session, root_id):
     """
     input:
         - root_id
-        - engine
+        - session
     output:
         - Newick tree to construct a graph
     """
 
     # get info about the family from the database
-    with Session(engine) as session:
-        query = session.query(TrackDB).filter(TrackDB.root == root_id)
-        df = pd.read_sql(query.statement, engine)
+    query = session.query(TrackDB).filter(TrackDB.root == root_id)
+    df = pd.read_sql(query.statement, session.bind)
 
     # make sure that the root of this id exists
     assert len(df) > 0, "No data for this root_id"
@@ -162,8 +160,6 @@ def build_lineage_widget(t_max):
     Builds pyqt widget to display lineage tree.
     """
 
-    global plot_widget
-
     plot_widget = pg.GraphicsLayoutWidget()
     plot_view = plot_widget.addPlot(
         title="Lineage tree", labels={"bottom": "Time"}
@@ -174,7 +170,7 @@ def build_lineage_widget(t_max):
     return plot_widget
 
 
-def update_lineage_display(viewer, plot_widget, engine):
+def update_lineage_display(viewer, plot_widget, session):
     """
     This function is called by the even handler
     when the user selects a label in the napari viewer.
@@ -188,12 +184,9 @@ def update_lineage_display(viewer, plot_widget, engine):
     active_label = int(viewer.layers["Labels"].selected_label)
 
     # check if the label is in the database
-    with Session(engine) as session:
-        query = (
-            session.query(TrackDB)
-            .filter(TrackDB.track_id == active_label)
-            .first()
-        )
+    query = (
+        session.query(TrackDB).filter(TrackDB.track_id == active_label).first()
+    )
 
     # actions based on finding the label in the database
     if query is not None:
@@ -204,7 +197,7 @@ def update_lineage_display(viewer, plot_widget, engine):
         viewer.status = f"Family of track number {root}."
 
         # buid the tree
-        tree = build_Newick_tree(engine, root)
+        tree = build_Newick_tree(session, root)
 
         # update the widget with the tree
         plot_view = render_tree_view(plot_view, tree, viewer)
