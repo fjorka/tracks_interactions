@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -191,16 +192,16 @@ def _connect_t2(session, t2, t1, current_frame):
         current_frame - frame were t2 will be starting from mitosis
     """
 
-    # if there is remaining part at the beginning
+    # if there is a remaining part at the beginning
     if t2.t_begin < current_frame:
         # create a new track
         new_track = newTrack_number(session)
 
         track = TrackDB(
             track_id=new_track,
-            parent_track_id=t2.parent_track_id,
-            root=t2.root,
-            t_begin=t2.t_begin,
+            parent_track_id=deepcopy(t2.parent_track_id),
+            root=deepcopy(t2.root),
+            t_begin=deepcopy(t2.t_begin),
             t_end=current_frame - 1,
         )
 
@@ -212,15 +213,15 @@ def _connect_t2(session, t2, t1, current_frame):
     else:
         new_track = None
 
+    # modify family relations
     t2.parent_track_id = t1.track_id
-    t2.root = t1.root
 
     # process descendants
     descendants = get_descendants(session, t2.track_id)
 
-    for track in descendants[1:]:
+    for tr in descendants:
         # change the value of the root track
-        track.root = t1.root
+        tr.root = t1.root
 
     session.commit()
 
@@ -228,44 +229,44 @@ def _connect_t2(session, t2, t1, current_frame):
     return new_track
 
 
-def merge_trackDB(session, t1_ind, t2_ind, current_frame):
-    """
-    Function to merge two tracks in trackDB.
-    For a merge to happen t1 has to exist on current_frame - 1 time point
-    """
+# def merge_trackDB(session, t1_ind, t2_ind, current_frame):
+#     """
+#     Function to merge two tracks in trackDB.
+#     For a merge to happen t1 has to exist on current_frame - 1 time point
+#     """
 
-    # get tracks of interest
-    t1 = session.query(TrackDB).filter_by(track_id=t1_ind).first()
-    t2 = session.query(TrackDB).filter_by(track_id=t2_ind).first()
+#     # get tracks of interest
+#     t1 = session.query(TrackDB).filter_by(track_id=t1_ind).first()
+#     t2 = session.query(TrackDB).filter_by(track_id=t2_ind).first()
 
-    # if t1 doesn't start yet
-    if t1.t_begin >= current_frame:
-        return -1
+#     # if t1 doesn't start yet
+#     if t1.t_begin >= current_frame:
+#         return -1
 
-    # if t1 is to be cut
-    if (t1.t_begin < current_frame) and (t1.t_end >= current_frame):
-        _, t1_after = cut_trackDB(session, t1.track_id, current_frame)
+#     # if t1 is to be cut
+#     if (t1.t_begin < current_frame) and (t1.t_end >= current_frame):
+#         _, t1_after = cut_trackDB(session, t1.track_id, current_frame)
 
-    # if t1 is ending before current_frame
-    elif t1.t_end < current_frame:
-        t1_after = None
+#     # if t1 is ending before current_frame
+#     elif t1.t_end < current_frame:
+#         t1_after = None
 
-        # if there is offsprint detach them as separate trees
-        descendants = get_descendants(session, t1.track_id)
+#         # if there is offsprint detach them as separate trees
+#         descendants = get_descendants(session, t1.track_id)
 
-        for track in descendants[1:]:
-            # change for children
-            if track.parent_track_id == t1.track_id:
-                # this route will call descendants twice but I expect it to be rare
-                _, _ = cut_trackDB(session, track.track_id, track.t_begin)
+#         for track in descendants[1:]:
+#             # change for children
+#             if track.parent_track_id == t1.track_id:
+#                 # this route will call descendants twice but I expect it to be rare
+#                 _, _ = cut_trackDB(session, track.track_id, track.t_begin)
 
-    # change t1_before
-    t1.t_end = t2.t_end
+#     # change t1_before
+#     t1.t_end = t2.t_end
 
-    # merge t2 to t1
-    _merge_t2(session, t2, t1, current_frame)
+#     # merge t2 to t1
+#     _merge_t2(session, t2, t1, current_frame)
 
-    return t1_after
+#     return t1_after
 
 
 def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
@@ -353,69 +354,69 @@ def _get_track_bbox(query):
     return (t_start, t_stop, row_start, row_stop, column_start, column_stop)
 
 
-def cut_cellsDB_mitosis(session, active_label):
-    """
-    Function to cut the cell of from mitotic event.
-    input:
-        session
-        active_label - label for which the track is cut
-    output:
-        None
-    """
+# def cut_cellsDB_mitosis(session, active_label):
+#     """
+#     Function to cut the cell of from mitotic event.
+#     input:
+#         session
+#         active_label - label for which the track is cut
+#     output:
+#         None
+#     """
 
-    cell = (
-        session.query(CellDB)
-        .filter(CellDB.track_id == active_label)
-        .order_by(CellDB.t)
-        .first()
-    )
+#     cell = (
+#         session.query(CellDB)
+#         .filter(CellDB.track_id == active_label)
+#         .order_by(CellDB.t)
+#         .first()
+#     )
 
-    assert isinstance(cell, CellDB), "No cells found for the given track"
+#     assert isinstance(cell, CellDB), "No cells found for the given track"
 
-    cell.parent_id = -1
+#     cell.parent_id = -1
 
-    session.commit()
+#     session.commit()
 
 
-def cut_cellsDB(session, active_label, current_frame, new_track):
-    """
-    Function to change track_id in cellsDB.
-    To minimize the number of queries returns the bounding box of the track
-    and the value for a new track_id.
-    input:
-        session
-        active_label - label for which the track is cut
-        current_frame - current time point
-    output:
-        track_bbox - bounding box of the track
-    """
+# def cut_cellsDB(session, active_label, current_frame, new_track):
+#     """
+#     Function to change track_id in cellsDB.
+#     To minimize the number of queries returns the bounding box of the track
+#     and the value for a new track_id.
+#     input:
+#         session
+#         active_label - label for which the track is cut
+#         current_frame - current time point
+#     output:
+#         track_bbox - bounding box of the track
+#     """
 
-    # query CellDB
-    # order by time
-    query = (
-        session.query(CellDB)
-        .filter(
-            and_(CellDB.track_id == active_label, CellDB.t >= current_frame)
-        )
-        .order_by(CellDB.t)
-        .all()
-    )
+#     # query CellDB
+#     # order by time
+#     query = (
+#         session.query(CellDB)
+#         .filter(
+#             and_(CellDB.track_id == active_label, CellDB.t >= current_frame)
+#         )
+#         .order_by(CellDB.t)
+#         .all()
+#     )
 
-    assert len(query) > 0, "No cells found for the given track"
+#     assert len(query) > 0, "No cells found for the given track"
 
-    # change the parent id of the first cell
-    query[0].parent_id = -1
+#     # change the parent id of the first cell
+#     query[0].parent_id = -1
 
-    # change track_ids for the cells
-    for cell in query:
-        cell.track_id = new_track
+#     # change track_ids for the cells
+#     for cell in query:
+#         cell.track_id = new_track
 
-    # get the track_bbox
-    track_bbox = _get_track_bbox(query)
+#     # get the track_bbox
+#     track_bbox = _get_track_bbox(query)
 
-    session.commit()
+#     session.commit()
 
-    return track_bbox
+#     return track_bbox
 
 
 def modify_track_cellsDB(

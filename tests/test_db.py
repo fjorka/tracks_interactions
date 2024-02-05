@@ -699,9 +699,9 @@ def test_freely_floating_connect(db_session):
 def test_double_cut_connect(db_session):
     """Test merging tracks when both need to be cut."""
 
-    t1_ind = 1
-    t2_ind = 15854
-    current_frame = 5
+    t1_ind = 15856
+    t2_ind = 17175
+    current_frame = 60
 
     expected_t1_after = newTrack_number(db_session)
     expected_t2_before = newTrack_number(db_session) + 1

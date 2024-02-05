@@ -5,19 +5,20 @@ from napari import Viewer
 def modify_labels(viewer: Viewer, track_bbox, active_label, new_track):
     """
     Function to change values of the labels layer.
+    track_bbox is a tuple of 6 integers.
     """
 
     # modify labels
     labels = viewer.layers["Labels"].data
 
     sel = labels[
-        track_bbox[0] : track_bbox[1],
+        track_bbox[0] : track_bbox[1] + 1,
         track_bbox[2] : track_bbox[3],
         track_bbox[4] : track_bbox[5],
     ]
     sel[sel == active_label] = new_track
     labels[
-        track_bbox[0] : track_bbox[1],
+        track_bbox[0] : track_bbox[1] + 1,
         track_bbox[2] : track_bbox[3],
         track_bbox[4] : track_bbox[5],
     ] = sel
@@ -175,9 +176,6 @@ def connect_track_function(viewer: Viewer, t1: int, session):
         )
         return
 
-    # trigger family tree update
-    viewer.layers["Labels"].selected_label = t2
-
     if t1_after is not None:
         # modify cellsDB of t1_before
         track_bbox_t1 = fdb.modify_track_cellsDB(
@@ -208,6 +206,9 @@ def connect_track_function(viewer: Viewer, t1: int, session):
 
     elif t1_after is None or t2_before is None:
         viewer.status = f"Track {t2} has been connected to {t1}."
+
+    # trigger family tree update
+    viewer.layers["Labels"].selected_label = t2
 
 
 ####################################################################################################
