@@ -407,6 +407,7 @@ def test_double_cut_merge(db_session):
     t2_org = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
 
     # make deep copies because otherwise the objects stay connected to the database
+    # copies are necessary for comparison of properties later in the test
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
@@ -656,3 +657,7 @@ def test_before_t2_track_merge(db_session):
 
     assert ch1.parent_track_id == expected_new_track
     assert ch1.root == expected_new_track
+
+
+def test_connect_simple(db_session):
+    pass

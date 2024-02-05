@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from ete3 import Tree
+from PyQt5.QtCore import Qt
 
 from tracks_interactions.db.db_model import TrackDB
 
@@ -105,6 +106,7 @@ def render_tree_view(plot_view, t, viewer):
     """
 
     labels_layer = viewer.layers["Labels"]
+    active_label = int(viewer.layers["Labels"].selected_label)
 
     y_max = 1
 
@@ -130,9 +132,17 @@ def render_tree_view(plot_view, t, viewer):
             y_max = np.max([n.y, y_max])
 
             label_color = labels_layer.get_color(node_name)
-            pen = pg.mkPen(
-                color=pg.mkColor((label_color * 255).astype(int)), width=5
-            )
+            if node_name == active_label:
+                pen = pg.mkPen(
+                    color=pg.mkColor((label_color * 255).astype(int)), width=5
+                )
+
+            else:
+                label_color[-1] = 0.6
+                pen = pg.mkPen(
+                    color=pg.mkColor((label_color * 255).astype(int)), width=4
+                )
+                pen.setStyle(Qt.DotLine)
 
             plot_view.plot(x_signal, y_signal, pen=pen)
 
