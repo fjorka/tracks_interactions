@@ -3,11 +3,10 @@ from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.orm import make_transient, sessionmaker
 
 from tracks_interactions.db.db_functions import (
-    cut_cellsDB,
-    cut_cellsDB_mitosis,
     cut_trackDB,
     get_descendants,
-    merge_trackDB,
+    integrate_trackDB,
+    modify_track_cellsDB,
     newTrack_number,
 )
 
@@ -315,8 +314,8 @@ def test_cut_trackDB_mitosis(db_session):
     )
 
 
-def test_cut_cellsDB(db_session):
-    """Test checking whether the cut_cellsDB function works correctly."""
+def test_modify_track_cellsDB_after(db_session):
+    """Test checking whether the modify_track_cellsDB function works correctly."""
 
     active_label = 15854
 
@@ -328,7 +327,9 @@ def test_cut_cellsDB(db_session):
     current_frame = 5
     new_track = 100
 
-    _ = cut_cellsDB(db_session, active_label, current_frame, new_track)
+    _ = modify_track_cellsDB(
+        db_session, active_label, current_frame, new_track, direction="after"
+    )
 
     # assert that there are only 5 objects of old track in the cell table after cut
     assert (
@@ -341,61 +342,88 @@ def test_cut_cellsDB(db_session):
         db_session.query(CellDB).filter_by(track_id=new_track).all()
     ) == (org_stop - current_frame + 1)
 
-    # assert that the first object in a new track doesn't have a parent
-    assert (
-        db_session.query(CellDB)
-        .filter_by(track_id=new_track)
-        .filter(CellDB.t == current_frame)
-        .one()
-        .parent_id
-        == -1
-    )
 
-    # assert that parents are not changed on the original track
-    assert (
-        db_session.query(CellDB)
-        .filter_by(track_id=active_label)
-        .filter(CellDB.t == current_frame - 1)
-        .one()
-        .parent_id
-        == db_session.query(CellDB)
-        .filter_by(track_id=active_label)
-        .filter(CellDB.t == current_frame - 2)
-        .one()
-        .id
-    )
+def test_modify_track_cellsDB_before(db_session):
+    """Test checking whether the modify_track_cellsDB function works correctly."""
 
-
-def test_cut_cellsDB_mitosis(db_session):
-    """Test checking whether the cut_cellsDB function works correctly."""
-
-    active_label = 15856
+    active_label = 15854
 
     # check how long the track is before the cut
-    records_org = (
-        db_session.query(CellDB)
-        .filter_by(track_id=active_label)
-        .order_by(CellDB.t)
-        .all()
+    org_stop = (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
     )
 
-    cut_cellsDB_mitosis(db_session, active_label)
+    current_frame = 5
+    new_track = 100
 
-    records = (
-        db_session.query(CellDB)
-        .filter_by(track_id=active_label)
-        .order_by(CellDB.t)
-        .all()
+    _ = modify_track_cellsDB(
+        db_session, active_label, current_frame, new_track, direction="before"
     )
 
-    assert records[0].parent_id == -1
-    assert records[1].parent_id == records[0].id
-    assert records[1] == records_org[1]
+    # assert that there are only 5 objects of old track in the cell table after cut
+    assert len(
+        db_session.query(CellDB).filter_by(track_id=active_label).all()
+    ) == (org_stop - current_frame + 1)
+
+    # assert that there is expected number of objects in new track
+    assert (
+        len(db_session.query(CellDB).filter_by(track_id=new_track).all())
+        == current_frame
+    )
+
+    # assert that there is expected number of objects in new track
+    assert (
+        len(db_session.query(CellDB).filter_by(track_id=new_track).all())
+        == current_frame
+    )
+
+
+def test_freely_floating_merge(db_session):
+    """Test merging when no cut is needed."""
+
+    t1_ind = 4
+    t2_ind = 5
+    current_frame = 41
+
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    t2_org = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    t1 = TrackDB()
+    for key in t1_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t1, key, getattr(t1_org, key))
+
+    # Detach the copy from the session
+    make_transient(t1)
+
+    t2 = TrackDB()
+    for key in t2_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t2, key, getattr(t2_org, key))
+
+    # Detach the copy from the session
+    make_transient(t2)
+
+    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+
+    # assert that the merger from track is not in the database
+    assert len(db_session.query(TrackDB).filter_by(track_id=t2_ind).all()) == 0
+
+    # assert that the merger to has expected properties
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_end == t2.t_end
+    assert new_t1.t_begin == t1.t_begin
+    assert new_t1.parent_track_id == t1.parent_track_id
+    assert new_t1.root == t1.root
 
 
 def test_double_cut_merge(db_session):
-    """Test checking if a freely floating track can be merged.
-    No descendants on neither side."""
+    """Test merging tracks when both need to be cut."""
 
     t1_ind = 1
     t2_ind = 15854
@@ -428,7 +456,7 @@ def test_double_cut_merge(db_session):
     # Detach the copy from the session
     make_transient(t2)
 
-    merge_trackDB(db_session, t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
 
     # assert that the merger from track is not in the database
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -459,53 +487,8 @@ def test_double_cut_merge(db_session):
     assert t_new.root == expected_new_track
 
 
-def test_freely_floating_merge(db_session):
-    """Test merging situation when both tracks were cut."""
-
-    t1_ind = 4
-    t2_ind = 5
-    current_frame = 41
-
-    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
-    t2_org = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
-
-    # make deep copies because otherwise the objects stay connected to the database
-    t1 = TrackDB()
-    for key in t1_org.__dict__:
-        if (
-            key != "_sa_instance_state"
-        ):  # Exclude the SQLAlchemy instance state
-            setattr(t1, key, getattr(t1_org, key))
-
-    # Detach the copy from the session
-    make_transient(t1)
-
-    t2 = TrackDB()
-    for key in t2_org.__dict__:
-        if (
-            key != "_sa_instance_state"
-        ):  # Exclude the SQLAlchemy instance state
-            setattr(t2, key, getattr(t2_org, key))
-
-    # Detach the copy from the session
-    make_transient(t2)
-
-    merge_trackDB(db_session, t1_ind, t2_ind, current_frame)
-
-    # assert that the merger from track is not in the database
-    assert len(db_session.query(TrackDB).filter_by(track_id=t2_ind).all()) == 0
-
-    # assert that the merger to has expected properties
-    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
-    assert new_t1.t_end == t2.t_end
-    assert new_t1.t_begin == t1.t_begin
-    assert new_t1.parent_track_id == t1.parent_track_id
-    assert new_t1.root == t1.root
-
-
-def test_after_t1_track_merge(db_session):
-    """Test checking if a freely floating track can be merged.
-    No descendants on neither side."""
+def test_after_t1_end_track_merge(db_session):
+    """ """
 
     t1_ind = 15854
     t2_ind = 17179
@@ -545,7 +528,7 @@ def test_after_t1_track_merge(db_session):
     # Detach the copy from the session
     make_transient(t2)
 
-    merge_trackDB(db_session, t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
 
     # assert single objects of t1 and t2
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -581,7 +564,7 @@ def test_after_t1_track_merge(db_session):
     assert ch1.root == child1
 
 
-def test_before_t2_track_merge(db_session):
+def test_before_t2_start_track_merge(db_session):
     """Test checking if a freely floating track can be merged.
     No descendants on neither side."""
 
@@ -623,7 +606,7 @@ def test_before_t2_track_merge(db_session):
     # Detach the copy from the session
     make_transient(t2)
 
-    merge_trackDB(db_session, t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
 
     # assert single objects of t1 and t2
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -659,5 +642,128 @@ def test_before_t2_track_merge(db_session):
     assert ch1.root == expected_new_track
 
 
-def test_connect_simple(db_session):
-    pass
+def test_freely_floating_connect(db_session):
+    """Test connecting parent-offspring when no cut is needed."""
+
+    t1_ind = 4
+    t2_ind = 5
+    current_frame = 41
+
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    t2_org = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    t1 = TrackDB()
+    for key in t1_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t1, key, getattr(t1_org, key))
+
+    # Detach the copy from the session
+    make_transient(t1)
+
+    t2 = TrackDB()
+    for key in t2_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t2, key, getattr(t2_org, key))
+
+    # Detach the copy from the session
+    make_transient(t2)
+
+    t1_after, t2_before = integrate_trackDB(
+        db_session, "connect", t1_ind, t2_ind, current_frame
+    )
+
+    # assert that the merger to has expected properties
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_end == t1.t_end
+    assert new_t1.t_begin == t1.t_begin
+    assert new_t1.parent_track_id == t1.parent_track_id
+    assert new_t1.root == t1.root
+
+    # assert that the merger to has expected properties
+    new_t2 = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
+    assert new_t2.t_end == t2.t_end
+    assert new_t2.t_begin == t2.t_begin
+    assert new_t2.parent_track_id == t1.track_id
+    assert new_t2.root == t1.root
+
+    # assert that the new track was not created
+    assert t1_after is None
+    assert t2_before is None
+
+
+def test_double_cut_connect(db_session):
+    """Test merging tracks when both need to be cut."""
+
+    t1_ind = 1
+    t2_ind = 15854
+    current_frame = 5
+
+    expected_t1_after = newTrack_number(db_session)
+    expected_t2_before = newTrack_number(db_session) + 1
+
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    t2_org = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    # copies are necessary for comparison of properties later in the test
+    t1 = TrackDB()
+    for key in t1_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t1, key, getattr(t1_org, key))
+
+    # Detach the copy from the session
+    make_transient(t1)
+
+    t2 = TrackDB()
+    for key in t2_org.__dict__:
+        if (
+            key != "_sa_instance_state"
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t2, key, getattr(t2_org, key))
+
+    # Detach the copy from the session
+    make_transient(t2)
+
+    t1_after, t2_before = integrate_trackDB(
+        db_session, "connect", t1_ind, t2_ind, current_frame
+    )
+
+    assert expected_t1_after == t1_after
+    assert expected_t2_before == t2_before
+
+    # assert that the merger to has expected properties
+
+    # t1
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_begin == t1.t_begin
+    assert new_t1.t_end == current_frame - 1
+    assert new_t1.parent_track_id == t1.parent_track_id
+    assert new_t1.root == t1.root
+
+    # t2
+    new_t2 = db_session.query(TrackDB).filter_by(track_id=t2_ind).one()
+    assert new_t2.t_end == t2.t_end
+    assert new_t2.t_begin == current_frame
+    assert new_t2.parent_track_id == t1.track_id
+    assert new_t2.root == t1.root
+
+    # t1_after
+    t1_after = db_session.query(TrackDB).filter_by(track_id=t1_after).one()
+    assert t1_after.t_begin == current_frame
+    assert t1_after.t_end == t1.t_end
+    assert t1_after.parent_track_id == -1
+    assert t1_after.root == t1_after.track_id
+
+    # t2_before
+    t2_before = db_session.query(TrackDB).filter_by(track_id=t2_before).one()
+    assert t2_before.t_begin == t2.t_begin
+    assert t2_before.t_end == current_frame - 1
+    assert t2_before.parent_track_id == t2.parent_track_id
+    assert t2_before.root == t2.root

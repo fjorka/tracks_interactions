@@ -200,7 +200,7 @@ def _connect_t2(session, t2, t1, current_frame):
             track_id=new_track,
             parent_track_id=t2.parent_track_id,
             root=t2.root,
-            t_begi=t2.begin,
+            t_begin=t2.t_begin,
             t_end=current_frame - 1,
         )
 
@@ -270,8 +270,17 @@ def merge_trackDB(session, t1_ind, t2_ind, current_frame):
 
 def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
     """
-    Function to connect tracks in trackDB as a parent-offspring.
-    For a connection to happen t1 has to exist on current_frame - 1 time point
+    Function to merge or connect two tracks in trackDB.
+    For the opperation to happen t1 has to exist on current_frame - 1 time point
+    input:
+        session
+        operation - "merge" or "connect"
+        t1_ind - label of the first track
+        t2_ind - label of the second track
+        current_frame - current time point
+    output:
+        t1_after - label of the new track if t1 is cut
+        t2_before - label of the new track if t2 is cut
     """
 
     # get tracks of interest
@@ -306,12 +315,17 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
 
         # merge t2 to t1
         _merge_t2(session, t2, t1, current_frame)
+        t2_before = None
 
-    if operation == "connect":
+    elif operation == "connect":
+        # change t1
+        t1.t_end = current_frame - 1
         t2_before = _connect_t2(session, t2, t1, current_frame)
 
     else:
-        raise ValueError("Unknown operation. Use 'merge' or 'connect'.")
+        raise ValueError(
+            f"Unknown operation '{operation}'. Use 'merge' or 'connect'."
+        )
 
     return t1_after, t2_before
 
