@@ -49,15 +49,13 @@ def cut_track_function(viewer: Viewer, session):
 
     # if cutting from mitosis
     if mitosis:
-        fdb.cut_cellsDB_mitosis(session, active_label)
-
         # trigger family tree update
         viewer.layers["Labels"].selected_label = active_label
 
     # if cutting in the middle of a track
     elif new_track:
-        track_bbox = fdb.cut_cellsDB(
-            session, active_label, current_frame, new_track
+        track_bbox = fdb.modify_track_cellsDB(
+            session, active_label, current_frame, new_track, direction="after"
         )
 
         # modify labels
@@ -120,13 +118,17 @@ def merge_track_function(viewer: Viewer, t1: int, session):
 
     if t1_after is not None:
         # modify cellsDB of t1
-        track_bbox_t1 = fdb.cut_cellsDB(session, t1, current_frame, t1_after)
+        track_bbox_t1 = fdb.modify_track_cellsDB(
+            session, t1, current_frame, t1_after, direction="after"
+        )
 
         # modify labels of t1
         modify_labels(viewer, track_bbox_t1, t1, t1_after)
 
     # modify cellsDB of t2
-    track_bbox_t2 = fdb.cut_cellsDB(session, t2, current_frame, t1)
+    track_bbox_t2 = fdb.modify_track_cellsDB(
+        session, t2, current_frame, t1, direction="after"
+    )
 
     # modify labels of t2
     modify_labels(viewer, track_bbox_t2, t2, t1)

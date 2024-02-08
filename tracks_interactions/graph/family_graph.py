@@ -188,7 +188,10 @@ def update_lineage_display(viewer, plot_widget, session):
 
     # clear the widget
     plot_view = plot_widget.getItem(0, 0)
-    plot_view.clear()
+    # Clear all elements except the last one
+    items_to_remove = plot_view.items[1:]  # Get all items except the time line
+    for item in items_to_remove:
+        plot_view.removeItem(item)
 
     # get an active label
     active_label = int(viewer.layers["Labels"].selected_label)
@@ -214,3 +217,16 @@ def update_lineage_display(viewer, plot_widget, session):
 
     else:
         viewer.status = "Error - no such label in the database."
+
+
+def update_family_line(plot_widget, slider_position):
+    """
+    This function is called by the event handler
+    when there is a change of the time point.
+    """
+
+    # get direct access to the line
+    plot_view = plot_widget.getItem(0, 0)
+    time_line = plot_view.items[0]
+
+    time_line.setValue(slider_position)

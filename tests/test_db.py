@@ -9,8 +9,6 @@ from tracks_interactions.db.db_functions import (
     modify_track_cellsDB,
     newTrack_number,
 )
-
-# merge_trackDB,
 from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
 
 
