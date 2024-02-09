@@ -22,6 +22,7 @@ class TrackNavigationWidget(QWidget):
     #########################################################
     # shortcuts
     #########################################################
+
     def init_shortcuts(self):
         """
         Initialize shortcuts for the widget.
@@ -50,6 +51,7 @@ class TrackNavigationWidget(QWidget):
     #########################################################
     # track navigation
     #########################################################
+
     def add_navigation_control(self):
         """
         Add a set of buttons to navigate position within the track

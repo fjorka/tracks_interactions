@@ -28,6 +28,7 @@ class TrackModificationWidget(QWidget):
     #########################################################
     # track modification
     #########################################################
+
     def add_modification_control(self):
         """
         Add a set of buttons to modify tracks
