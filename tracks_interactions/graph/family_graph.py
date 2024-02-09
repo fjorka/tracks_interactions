@@ -6,8 +6,10 @@ from pyqtgraph import GraphicsLayoutWidget, TextItem, mkColor, mkPen
 
 from tracks_interactions.db.db_model import TrackDB
 
+# class FamilyGraphPlot
 
-class FamilyGraph(GraphicsLayoutWidget):
+
+class FamilyGraphWidget(GraphicsLayoutWidget):
     def __init__(self, viewer, session):
         super().__init__()
 

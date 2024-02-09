@@ -1,4 +1,10 @@
-from qtpy.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from qtpy.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 from sqlalchemy import and_
 
 from tracks_interactions.db.db_model import CellDB, TrackDB
@@ -18,6 +24,9 @@ class TrackNavigationWidget(QWidget):
 
         # add track navigation
         self.navigation_row = self.add_navigation_control()
+
+        # add checkbox for following the object
+        self.follow_object_checkbox = self.add_follow_object_checkbox()
 
     #########################################################
     # shortcuts
@@ -181,3 +190,38 @@ class TrackNavigationWidget(QWidget):
 
         # center the cell
         self.center_object_core_function()
+
+    #########################################################
+    # cell following
+    #########################################################
+
+    def add_follow_object_checkbox(self):
+        """
+        Add a checkbox to follow the object.
+        """
+        follow_object_checkbox = QCheckBox("Follow track")
+
+        follow_object_checkbox.stateChanged.connect(
+            self.followBoxStateChanged_function
+        )
+
+        self.layout().addWidget(follow_object_checkbox)
+
+        return follow_object_checkbox
+
+    def followBoxStateChanged_function(self):
+        """
+        Follow the object if the checkbox is checked.
+        """
+        if self.follow_object_checkbox.isChecked():
+            # connect the function to follow the cell
+            self.viewer.dims.events.current_step.connect(
+                self.center_object_core_function
+            )
+            # center the cell (as at the beginning no slider is triggered)
+            self.center_object_core_function()
+        else:
+            self.viewer.status = "Following the object is turned off."
+            self.viewer.dims.events.current_step.disconnect(
+                self.center_object_core_function
+            )
