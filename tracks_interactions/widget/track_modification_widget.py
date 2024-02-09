@@ -39,29 +39,31 @@ class TrackModificationWidget(QWidget):
         modification_row.setLayout(QGridLayout())
 
         # Create the first row widgets
-        labelT1 = QLabel("T1")
-        self.T1_box = self.add_T_spinbox(self.labels.selected_label)
+        labelT2 = QLabel("Active")
+        self.T2_box = self.add_T_spinbox(self.labels.selected_label)
         arrowLabel = QLabel(
             "→", alignment=Qt.AlignCenter
         )  # Big arrow label, centered
         arrowLabel.setStyleSheet("font-size: 24px;")  # Making the arrow bigger
-        labelT2 = QLabel("T2")
-        self.T2_box = self.add_T_spinbox(self.labels.selected_label)
+        labelT1 = QLabel("to")
+        self.T1_box = self.add_T_spinbox(self.labels.selected_label)
 
         # connect spinboxed to the event of changing the track
         self.labels.events.selected_label.connect(self.T_function)
+        # connect change of T2 to change of active label
+        self.T2_box.valueChanged.connect(self.T2_change_function)
 
         # Add first row widgets to the layout
-        modification_row.layout().addWidget(labelT1, 0, 0)  # Row 0, Column 0
+        modification_row.layout().addWidget(labelT2, 0, 0)  # Row 0, Column 0
         modification_row.layout().addWidget(
-            self.T1_box, 0, 1
+            self.T2_box, 0, 1
         )  # Row 0, Column 1
         modification_row.layout().addWidget(
             arrowLabel, 0, 2
         )  # Row 0, Column 2
-        modification_row.layout().addWidget(labelT2, 0, 3)  # Row 0, Column 3
+        modification_row.layout().addWidget(labelT1, 0, 3)  # Row 0, Column 3
         modification_row.layout().addWidget(
-            self.T2_box, 0, 4
+            self.T1_box, 0, 4
         )  # Row 0, Column 4
 
         # create the buttons
@@ -99,9 +101,15 @@ class TrackModificationWidget(QWidget):
         """
         Change the values of T1 and T2 spinboxes.
         """
-        prev_tr = self.T1_box.value()
-        self.T1_box.setValue(self.labels.selected_label)
-        self.T2_box.setValue(prev_tr)
+        prev_tr = self.T2_box.value()
+        self.T2_box.setValue(self.labels.selected_label)
+        self.T1_box.setValue(prev_tr)
+
+    def T2_change_function(self, event):
+        """
+        Change the value of the active label.
+        """
+        self.labels.selected_label = self.T2_box.value()
 
     def add_cut_track_btn(self):
         """
@@ -185,8 +193,58 @@ class TrackModificationWidget(QWidget):
     def merge_track_function(self):
         """
         Function that performs all the changes after a track is merged.
+        Track T2 is merged to track T1.
         """
-        self.viewer.status = "Merge two tracks."
+
+        curr_fr = self.viewer.dims.current_step[0]
+
+        t2 = self.T2_box.value()
+        t1 = self.T1_box.value()
+
+        ################################################################################################
+        # check if the request is possible
+        if t1 == t2:
+            self.viewer.status = "Error - cannot merge a track with itself."
+            return
+
+        ################################################################################################
+        # perform database operations
+
+        # cut trackDB
+        t1_after, _ = fdb.integrate_trackDB(
+            self.session, "merge", t1, t2, curr_fr
+        )
+
+        if t1_after == -1:
+            self.viewer.status = (
+                "Error - cannot merge to a track that hasn't started yet."
+            )
+            return
+
+        # trigger family tree update
+        self.viewer.layers["Labels"].selected_label = t1
+
+        if t1_after is not None:
+            # modify cellsDB of t1
+            track_bbox_t1 = fdb.modify_track_cellsDB(
+                self.session, t1, curr_fr, t1_after, direction="after"
+            )
+
+            # modify labels of t1
+            modify_labels(self.viewer, track_bbox_t1, t1, t1_after)
+
+        # modify cellsDB of t2
+        track_bbox_t2 = fdb.modify_track_cellsDB(
+            self.session, t2, curr_fr, t1, direction="after"
+        )
+
+        # modify labels of t2
+        modify_labels(self.viewer, track_bbox_t2, t2, t1)
+
+        ################################################################################################
+        # change viewer status
+        self.T2_box.setValue(t2)
+        self.viewer.status = f"Track {t2} has been merged to {t1}. Track {t1_after} has been created."
 
     def add_connect_track_btn(self):
         """
@@ -201,5 +259,66 @@ class TrackModificationWidget(QWidget):
     def connect_track_function(self):
         """
         Function that performs all the changes after a track is connected.
+        Track
         """
-        self.viewer.status = "Connect two tracks."
+
+        # get the position in time
+        curr_fr = self.viewer.dims.current_step[0]
+
+        # get the tracks to interact with
+        t2 = self.T2_box.value()
+        t1 = self.T1_box.value()
+
+        ################################################################################################
+        # check if the request is possible
+        if t1 == t2:
+            self.viewer.status = "Error - cannot connect a track with itself."
+            return
+
+        ################################################################################################
+        # perform database operations
+
+        # cut trackDB
+        t1_after, t2_before = fdb.integrate_trackDB(
+            self.session, "connect", t1, t2, curr_fr
+        )
+
+        if t1_after == -1:
+            self.viewer.status = (
+                "Error - cannot connect to a track that hasn't started yet."
+            )
+            return
+
+        if t1_after is not None:
+            # modify cellsDB of t1_before
+            track_bbox_t1 = fdb.modify_track_cellsDB(
+                self.session, t1, curr_fr, t1_after, direction="after"
+            )
+
+            # modify labels of t1_after
+            modify_labels(self.viewer, track_bbox_t1, t1, t1_after)
+
+            # change viewer status
+            self.viewer.status = f"Track {t2} has been connected to {t1}. Track {t1_after} has been created."
+
+        if t2_before is not None:
+            # modify cellsDB of t2
+            track_bbox_t2 = fdb.modify_track_cellsDB(
+                self.session, t2, curr_fr, t2_before, direction="before"
+            )
+
+            # modify labels of t2_before
+            modify_labels(self.viewer, track_bbox_t2, t2, t2_before)
+
+            # change viewer status
+            self.viewer.status = f"Track {t2} has been connected to {t1}. Track {t2_before} has been created."
+
+        # account for different both and none new tracks in viewer status
+        if t1_after is not None and t2_before is not None:
+            self.viewer.status = f"Track {t2} has been connected to {t1}. Tracks {t1_after} and {t2_before} have been created."
+
+        elif t1_after is None or t2_before is None:
+            self.viewer.status = f"Track {t2} has been connected to {t1}."
+
+        # trigger family tree update
+        self.viewer.layers["Labels"].selected_label = t2
