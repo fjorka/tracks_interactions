@@ -52,7 +52,8 @@ class TrackModificationWidget(QWidget):
         # connect spinboxed to the event of changing the track
         self.labels.events.selected_label.connect(self.T_function)
         # connect change of T2 to change of active label
-        self.T2_box.valueChanged.connect(self.T2_change_function)
+        # self.T2_box.valueChanged.connect(self.T2_change_function)
+        self.T2_box.editingFinished.connect(self.T2_change_function)
 
         # Add first row widgets to the layout
         modification_row.layout().addWidget(labelT2, 0, 0)  # Row 0, Column 0
@@ -106,7 +107,7 @@ class TrackModificationWidget(QWidget):
         self.T2_box.setValue(self.labels.selected_label)
         self.T1_box.setValue(prev_tr)
 
-    def T2_change_function(self, event):
+    def T2_change_function(self):
         """
         Change the value of the active label.
         """
@@ -322,4 +323,4 @@ class TrackModificationWidget(QWidget):
             self.viewer.status = f"Track {t2} has been connected to {t1}."
 
         # trigger family tree update
-        self.viewer.layers["Labels"].selected_label = t2
+        self.viewer.layers["Labels"].selected_label = t1

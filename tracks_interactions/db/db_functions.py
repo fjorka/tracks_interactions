@@ -197,10 +197,13 @@ def _connect_t2(session, t2, t1, current_frame):
         # create a new track
         new_track = newTrack_number(session)
 
+        # check if the t2_before needs to become its own root
+        new_root = new_track if t2.root == t2.track_id else deepcopy(t2.root)
+
         track = TrackDB(
             track_id=new_track,
             parent_track_id=deepcopy(t2.parent_track_id),
-            root=deepcopy(t2.root),
+            root=new_root,
             t_begin=deepcopy(t2.t_begin),
             t_end=current_frame - 1,
         )
