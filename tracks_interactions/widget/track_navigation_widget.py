@@ -214,14 +214,28 @@ class TrackNavigationWidget(QWidget):
         Follow the object if the checkbox is checked.
         """
         if self.follow_object_checkbox.isChecked():
-            # connect the function to follow the cell
+            # center the cell (as at the beginning no slider is triggered)
+            self.center_object_core_function()
+
+            # connect centering to slider movement
             self.viewer.dims.events.current_step.connect(
                 self.center_object_core_function
             )
-            # center the cell (as at the beginning no slider is triggered)
-            self.center_object_core_function()
+
+            # connect centering to label selection
+            self.labels_layer.events.selected_label.connect(
+                self.center_object_core_function
+            )
+
         else:
             self.viewer.status = "Following the object is turned off."
+
+            # disconnect from slider movement
             self.viewer.dims.events.current_step.disconnect(
+                self.center_object_core_function
+            )
+
+            # disconnect from label selection
+            self.labels_layer.events.selected_label.disconnect(
                 self.center_object_core_function
             )

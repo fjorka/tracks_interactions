@@ -1,30 +1,42 @@
 import numpy as np
 import pandas as pd
 from ete3 import Tree
-from PyQt5.QtCore import Qt
-from pyqtgraph import GraphicsLayoutWidget, TextItem, mkColor, mkPen
+from pyqtgraph import (
+    GraphicsLayoutWidget,
+    TextItem,
+    mkColor,
+    mkPen,
+)
+from qtpy.QtCore import Qt
 
 from tracks_interactions.db.db_model import TrackDB
-
-# class FamilyGraphPlot
 
 
 class FamilyGraphWidget(GraphicsLayoutWidget):
     def __init__(self, viewer, session):
         super().__init__()
 
+        self.setContextMenuPolicy(Qt.NoContextMenu)
+
         self.session = session
         self.viewer = viewer
         self.labels_layer = self.viewer.layers["Labels"]
+
+        self.offset = 10  # investigate - temporary fix for shift in x position mouse click on family graph
+        self.click_precision = 10
 
         # initialize graph
         self.plot_view = self.addPlot(
             title="Lineage tree", labels={"bottom": "Time"}
         )
         self.plot_view.hideAxis("left")
-
         self.t_max = self.viewer.dims.range[0][1]
         self.plot_view.setXRange(0, self.t_max)
+        self.plot_view.setMouseEnabled(x=True, y=True)
+        self.plot_view.setMenuEnabled(False)
+
+        # Connect the plotItem's mouse click event
+        self.plot_view.scene().sigMouseClicked.connect(self.onMouseClick)
 
         # initialize time line
         pen = mkPen(color=(255, 255, 255), xwidth=1)
@@ -38,6 +50,41 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         self.labels_layer.events.selected_label.connect(
             self.update_lineage_display
         )
+
+    def onMouseClick(self, event):
+        """
+        Mouse click event handler.
+        Left - selection of a track
+        Right - selection of a time point
+        """
+        pos = event.pos()
+        x_val = self.plot_view.vb.mapSceneToView(pos + self.offset).x()
+        y_val = self.plot_view.vb.mapSceneToView(pos).y()
+
+        # right click - moving in time
+        if event.button() == Qt.RightButton:
+            self.viewer.status = f"Moving to position {round(x_val)}."
+            self.viewer.dims.set_point(0, round(x_val))
+            event.accept()
+
+        # left click - selection of a track
+        elif event.button() == Qt.LeftButton:
+            if self.tree is not None:
+                for n in self.tree.traverse():
+                    self.viewer.status = "Click closer to your chosen track."
+                    if n.is_root():
+                        pass
+                    else:
+                        # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
+                        if (
+                            (n.y > y_val - self.click_precision)
+                            and (n.y < y_val + self.click_precision)
+                            and (n.start <= x_val)
+                            and (n.stop >= x_val)
+                        ):
+                            self.viewer.status = f"Selected track: {n.name}"
+                            self.labels_layer.selected_label = n.name
+                            break
 
     def update_family_line(self):
         """
@@ -78,10 +125,10 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             self.viewer.status = f"Family of track number {root}."
 
             # buid the tree
-            tree = build_Newick_tree(self.session, root)
+            self.tree = build_Newick_tree(self.session, root)
 
             # update the widget with the tree
-            self.render_tree_view(tree)
+            self.render_tree_view(self.tree)
 
         else:
             self.viewer.status = "Error - no such label in the database."
