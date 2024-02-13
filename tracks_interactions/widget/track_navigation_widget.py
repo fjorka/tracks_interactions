@@ -134,8 +134,6 @@ class TrackNavigationWidget(QWidget):
         # find the pathway
         tr = self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
 
-        print(f"object {curr_tr} of {type(curr_tr)} found as {tr}")
-
         # move time point if beyond boundary
         if tr.t_begin > curr_fr:
             self.viewer.dims.set_point(0, tr.t_begin)
