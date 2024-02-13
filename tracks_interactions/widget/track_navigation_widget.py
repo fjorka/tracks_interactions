@@ -97,7 +97,9 @@ class TrackNavigationWidget(QWidget):
         Center the object that exists on this frame.
         """
         # orient yourself
-        curr_tr = self.labels.selected_label
+        curr_tr = int(
+            self.labels.selected_label
+        )  # because numpy.int64 is not accepted by the database
         curr_fr = self.viewer.dims.current_step[0]
 
         # find the object
@@ -124,11 +126,15 @@ class TrackNavigationWidget(QWidget):
         """
 
         # orient yourself
-        curr_tr = self.labels.selected_label
+        curr_tr = int(
+            self.labels.selected_label
+        )  # because numpy.int64 is not accepted by the database
         curr_fr = self.viewer.dims.current_step[0]
 
         # find the pathway
         tr = self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
+
+        print(f"object {curr_tr} of {type(curr_tr)} found as {tr}")
 
         # move time point if beyond boundary
         if tr.t_begin > curr_fr:
@@ -214,6 +220,8 @@ class TrackNavigationWidget(QWidget):
         Follow the object if the checkbox is checked.
         """
         if self.follow_object_checkbox.isChecked():
+            self.viewer.status = "Following the object is turned on."
+
             # center the cell (as at the beginning no slider is triggered)
             self.center_object_core_function()
 
@@ -223,7 +231,7 @@ class TrackNavigationWidget(QWidget):
             )
 
             # connect centering to label selection
-            self.labels_layer.events.selected_label.connect(
+            self.labels.events.selected_label.connect(
                 self.center_object_core_function
             )
 
@@ -236,6 +244,6 @@ class TrackNavigationWidget(QWidget):
             )
 
             # disconnect from label selection
-            self.labels_layer.events.selected_label.disconnect(
+            self.labels.events.selected_label.disconnect(
                 self.center_object_core_function
             )

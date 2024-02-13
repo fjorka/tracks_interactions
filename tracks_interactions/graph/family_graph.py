@@ -8,8 +8,9 @@ from pyqtgraph import (
     mkPen,
 )
 from qtpy.QtCore import Qt
+from sqlalchemy import and_
 
-from tracks_interactions.db.db_model import TrackDB
+from tracks_interactions.db.db_model import CellDB, TrackDB
 
 
 class FamilyGraphWidget(GraphicsLayoutWidget):
@@ -20,10 +21,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
         self.session = session
         self.viewer = viewer
-        self.labels_layer = self.viewer.layers["Labels"]
-
-        self.offset = 10  # investigate - temporary fix for shift in x position mouse click on family graph
-        self.click_precision = 10
+        self.labels = self.viewer.layers["Labels"]
 
         # initialize graph
         self.plot_view = self.addPlot(
@@ -47,9 +45,36 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         self.viewer.dims.events.current_step.connect(self.update_family_line)
 
         # connect label selection event
-        self.labels_layer.events.selected_label.connect(
-            self.update_lineage_display
+        self.labels.events.selected_label.connect(self.update_lineage_display)
+
+    # DUPLICATE from navigation - rethink
+    def center_object_core_function(self):
+        """
+        Center the object that exists on this frame.
+        """
+        # orient yourself
+        curr_tr = int(
+            self.labels.selected_label
+        )  # because numpy.int64 is not accepted by the database
+        curr_fr = self.viewer.dims.current_step[0]
+
+        # find the object
+        cell = (
+            self.session.query(CellDB)
+            .filter(and_(CellDB.track_id == curr_tr, CellDB.t == curr_fr))
+            .first()
         )
+
+        if cell is not None:
+            # get the position
+            x = cell.row
+            y = cell.col
+
+            # move the camera
+            self.viewer.camera.center = (0, x, y)
+
+        else:
+            self.viewer.status = "No object in this frame."
 
     def onMouseClick(self, event):
         """
@@ -57,34 +82,59 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         Left - selection of a track
         Right - selection of a time point
         """
-        pos = event.pos()
-        x_val = self.plot_view.vb.mapSceneToView(pos + self.offset).x()
-        y_val = self.plot_view.vb.mapSceneToView(pos).y()
+        vb = self.plot_view.vb
+        scene_coords = event.scenePos()
 
-        # right click - moving in time
-        if event.button() == Qt.RightButton:
-            self.viewer.status = f"Moving to position {round(x_val)}."
-            self.viewer.dims.set_point(0, round(x_val))
-            event.accept()
+        if self.plot_view.sceneBoundingRect().contains(scene_coords):
+            mouse_point = vb.mapSceneToView(scene_coords)
+            x_val = mouse_point.x()
+            y_val = mouse_point.y()
 
-        # left click - selection of a track
-        elif event.button() == Qt.LeftButton:
-            if self.tree is not None:
-                for n in self.tree.traverse():
-                    self.viewer.status = "Click closer to your chosen track."
-                    if n.is_root():
-                        pass
-                    else:
-                        # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
-                        if (
-                            (n.y > y_val - self.click_precision)
-                            and (n.y < y_val + self.click_precision)
-                            and (n.start <= x_val)
-                            and (n.stop >= x_val)
-                        ):
-                            self.viewer.status = f"Selected track: {n.name}"
-                            self.labels_layer.selected_label = n.name
-                            break
+            # right click - moving in time
+            if event.button() == Qt.RightButton:
+                self.viewer.status = (
+                    f"Right click at {x_val}, {y_val}. Not implemented."
+                )
+
+            # left click - selection of a track
+            elif event.button() == Qt.LeftButton:
+                # move in time
+                self.viewer.dims.set_point(0, round(x_val))
+                event.accept()
+
+                # make a track active
+                dist = float("inf")
+                selected_n = None
+
+                if self.tree is not None:
+                    for n in self.tree.traverse():
+                        if n.is_root():
+                            pass
+                        else:
+                            # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
+                            if (n.start <= x_val) and (n.stop >= x_val):
+                                dist_track = abs(n.y - y_val)
+                                if dist_track < dist:
+                                    dist = dist_track
+                                    selected_n = n
+
+                    # capture if it tries to get attribute from None
+                    try:
+                        self.viewer.status = (
+                            f"Selected track: {selected_n.name}"
+                        )
+                        self.labels.selected_label = selected_n.name
+
+                        # center the cell
+                        self.center_object_core_function()
+
+                    except AttributeError:
+                        print(
+                            f"Click at {scene_coords.x()},{scene_coords.x()} translated to {x_val}, {y_val}"
+                        )
+
+                else:
+                    self.viewer.status = "No tree to select from."
 
     def update_family_line(self):
         """
@@ -162,7 +212,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                 y_signal = n.y.repeat(2)
                 y_max = np.max([n.y, y_max])
 
-                label_color = self.labels_layer.get_color(node_name)
+                label_color = self.labels.get_color(node_name)
                 if node_name == active_label:
                     pen = mkPen(
                         color=mkColor((label_color * 255).astype(int)), width=5
