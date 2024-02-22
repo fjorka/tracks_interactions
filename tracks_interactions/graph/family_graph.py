@@ -92,9 +92,10 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
             # right click - moving in time
             if event.button() == Qt.RightButton:
-                self.viewer.status = (
-                    f"Right click at {x_val}, {y_val}. Not implemented."
-                )
+                pass
+                # self.viewer.status = (
+                #     f"Right click at {x_val}, {y_val}. Not implemented."
+                # )
 
             # left click - selection of a track
             elif event.button() == Qt.LeftButton:
