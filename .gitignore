@@ -84,5 +84,4 @@ venv/
 # written by setuptools_scm
 **/_version.py
 examples/metadata.toml
-tracks_interactions/graph/__pycache__/family_graph.cpython-310.pyc
-tracks_interactions/graph/__pycache__/family_graph.cpython-310.pyc
+tracks_interactions/graph/__pycache__
