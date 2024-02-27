@@ -1,9 +1,11 @@
 from copy import deepcopy
 from typing import Dict, List, Tuple
 
+import dask.array as da
 import numpy as np
 import pandas as pd
 from numba import njit
+from skimage.transform import resize
 from sqlalchemy import and_
 from sqlalchemy.orm import aliased
 from ultrack.tracks.graph import _fast_path_transverse, create_tracks_forest
@@ -457,3 +459,71 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     ), f"Something went wrong. Found unlabeled tracks\n{df[unlabeled_tracks]}"
 
     return df
+
+
+def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
+    """
+    Function to calculate signals of a single cell.
+    If a single plane given, frame information of a cell is not used.
+    """
+
+    # caclulate cell area
+    mask = np.array(cell.mask)
+    area = mask.sum()
+
+    cell_dict = {"area": int(area)}
+
+    if ch_list is None:
+        return cell_dict
+
+    # create a ring mask
+    cyto_mask = resize(
+        mask,
+        np.array(mask.shape) + 2 * ring_width,
+        order=0,
+        anti_aliasing=False,
+    )
+    cell_in_cyto_mask = np.zeros_like(cyto_mask)
+    cell_in_cyto_mask[
+        ring_width:-ring_width, ring_width:-ring_width
+    ] = cell.mask
+    cyto_mask[cell_in_cyto_mask] = 0
+
+    # check how to cut boxes
+
+    # calculate positions
+    r_start = np.max([0, cell.bbox_0 - ring_width])
+    c_start = np.max([0, cell.bbox_1 - ring_width])
+
+    ch = ch_list[0]
+    if ch.ndim == 3:
+        r_end = np.min([ch.shape[1], cell.bbox_2 + ring_width])
+        c_end = np.min([ch.shape[2], cell.bbox_3 + ring_width])
+    else:
+        r_end = np.min([ch.shape[0], cell.bbox_2 + ring_width])
+        c_end = np.min([ch.shape[1], cell.bbox_3 + ring_width])
+
+    # get signals for all the channels
+    if ch_names is None:
+        ch_names = [f"ch{i}" for i in range(len(ch_list))]
+    for ch, ch_name in zip(ch_list, ch_names):
+        # get channel ring boxes
+        if ch.ndim == 3:
+            ch_box = ch[cell.t, r_start:r_end, c_start:c_end]
+        else:
+            ch_box = ch[r_start:r_end, c_start:c_end]
+
+        # calculate signals
+        ch_nuc = np.mean(ch_box[cell_in_cyto_mask])
+        ch_cyto = np.mean(ch_box[cyto_mask])
+
+        # compute if necessary
+        if type(ch) == da.core.Array:
+            ch_nuc = ch_nuc.compute()
+            ch_cyto = ch_cyto.compute()
+
+        # add to the dictionary
+        cell_dict[ch_name + "_nuc"] = ch_nuc
+        cell_dict[ch_name + "_cyto"] = ch_cyto
+
+    return cell_dict
