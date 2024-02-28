@@ -492,8 +492,17 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
     # check how to cut boxes
 
     # calculate positions
-    r_start = np.max([0, cell.bbox_0 - ring_width])
-    c_start = np.max([0, cell.bbox_1 - ring_width])
+    r_start = cell.bbox_0 - ring_width
+    c_start = cell.bbox_1 - ring_width
+    r_paste_start = c_paste_start = 0
+
+    # account for edge cases
+    if r_start < 0:
+        r_paste_start = -r_start
+        r_start = 0
+    if c_start < 0:
+        c_paste_start = -c_start
+        c_start = 0
 
     ch = ch_list[0]
     if ch.ndim == 3:
@@ -506,19 +515,29 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
     # get signals for all the channels
     if ch_names is None:
         ch_names = [f"ch{i}" for i in range(len(ch_list))]
+
     for ch, ch_name in zip(ch_list, ch_names):
+        # create a box for the channel
+        ch_box = np.zeros_like(cyto_mask).astype(ch.dtype)
+
         # get channel ring boxes
         if ch.ndim == 3:
-            ch_box = ch[cell.t, r_start:r_end, c_start:c_end]
+            signal = ch[cell.t, r_start:r_end, c_start:c_end]
         else:
-            ch_box = ch[r_start:r_end, c_start:c_end]
+            signal = ch[r_start:r_end, c_start:c_end]
+
+        # paste the signal into the box
+        ch_box[
+            r_paste_start : (r_paste_start + signal.shape[0]),
+            c_paste_start : (c_paste_start + signal.shape[1]),
+        ] = signal
 
         # calculate signals
         ch_nuc = np.mean(ch_box[cell_in_cyto_mask])
         ch_cyto = np.mean(ch_box[cyto_mask])
 
         # compute if necessary
-        if type(ch) == da.core.Array:
+        if type(ch_nuc) == da.core.Array:
             ch_nuc = ch_nuc.compute()
             ch_cyto = ch_cyto.compute()
 
