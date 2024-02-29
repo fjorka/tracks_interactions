@@ -1,55 +1,43 @@
 from qtpy.QtWidgets import (
-    QHBoxLayout,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
+from tracks_interactions.db.db_functions import (
+    add_CellDB_to_DB,
+    calculate_cell_signals,
+    cut_trackDB,
+)
+from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
+
 
 class CellModificationWidget(QWidget):
-    def __init__(self, napari_viewer, sql_session):
+    def __init__(
+        self,
+        napari_viewer,
+        sql_session,
+        ch_list=None,
+        ch_names=None,
+        ring_width=5,
+    ):
         super().__init__()
         self.setLayout(QVBoxLayout())
 
         self.viewer = napari_viewer
         self.labels = self.viewer.layers["Labels"]
         self.session = sql_session
-
-        # add shortcuts
-        self.init_shortcuts()
-
-        # add track navigation
-        self.navigation_row = self.add_modification_control()
-
-    #########################################################
-    # shortcuts
-    #########################################################
-
-    def init_shortcuts(self):
-        """
-        Initialize shortcuts for the widget.
-        """
-
-    #########################################################
-    # modfiy cell
-    #########################################################
-
-    def add_modification_control(self):
-        """
-        Add a set of buttons to navigate position within the track
-        """
-
-        cell_row = QWidget()
-        cell_row.setLayout(QHBoxLayout())
-        cell_row.layout().setContentsMargins(0, 0, 0, 0)
+        self.ch_list = ch_list
+        self.ch_names = ch_names
+        self.ring_width = ring_width
 
         self.mod_cell_btn = self.add_mod_cell_btn()
+        self.layout().addWidget(self.mod_cell_btn)
 
-        cell_row.layout().addWidget(self.mod_cell_btn)
-
-        self.layout().addWidget(cell_row)
-
-        return cell_row
+        # add a keyboard shortcut for label modification
+        self.viewer.bind_key(
+            "Shift-Enter", self.mod_cell_function, overwrite=True
+        )
 
     def add_mod_cell_btn(self):
         """
@@ -61,21 +49,111 @@ class CellModificationWidget(QWidget):
 
         return mod_cell_btn
 
-    def mod_cell_function(self):
+    def mod_cell_function(self, viewer=None):
         """
         Store the current cell in the database.
         """
+
+        # orient yourself
         active_cell = self.labels.selected_label
-        # cell_properties = self.get_cell_properties()
+        frame = self.viewer.dims.current_step[0]
 
-        # store the cell in the CellDB
+        cell_list = (
+            self.session.query(CellDB)
+            .filter(CellDB.t == frame)
+            .filter(CellDB.track_id == active_cell)
+            .all()
+        )
 
-        # check if modification of TrackDB is needed
-        # and modify
+        # adding new cell
+        if len(cell_list) == 0:
+            #  create CellDB
+            new_cell = add_CellDB_to_DB(self.viewer)
+            new_signals = calculate_cell_signals(
+                new_cell,
+                ch_list=self.ch_list,
+                ch_names=self.ch_names,
+                ring_width=self.ring_width,
+            )
+            new_cell.signals = new_signals
+            self.session.add(new_cell)
+            self.session.commit()
 
-        # trigger update of the graphs
+            # introduce TrackDB changes
+            track = (
+                self.session.query(TrackDB)
+                .filter(TrackDB.track_id == active_cell)
+                .first()
+            )
+            if track is not None:
+                if track.t_begin > frame:
+                    track.t_begin = frame
+                    track.parent_track_id = NO_PARENT
+                    track.root = active_cell
+                if track.t_end < frame:
+                    track.t_end = frame
 
-        self.viewer.status = f"Cell {active_cell} saved"
+                    # find children
+                    children = (
+                        self.session.query(TrackDB)
+                        .filter(TrackDB.parent_track_id == active_cell)
+                        .all()
+                    )
+                    # cut off children
+                    for child in children:
+                        _, _ = cut_trackDB(
+                            self.session, child.track_id, child.t_begin
+                        )
+                        self.session.commit(child)
+
+                self.session.commit(track)
+            else:
+                new_track = TrackDB(
+                    track_id=active_cell,
+                    parent_track_id=NO_PARENT,
+                    root=active_cell,
+                    t_begin=frame,
+                    t_end=frame,
+                )
+                self.session.add(new_track)
+                self.session.commit()
+
+        # cell modification
+        elif len(cell_list) == 1:
+            cell = cell_list[0]
+            new_cell = add_CellDB_to_DB(self.viewer)
+            properties = [
+                "track_id",
+                "t",
+                "row",
+                "col",
+                "bbox_0",
+                "bbox_1",
+                "bbox_2",
+                "bbox_3",
+                "mask",
+                "tags",
+            ]
+            self.viewer.status = f"Modifying cell {active_cell} at {frame}."
+            for prop in properties:
+                setattr(cell, prop, getattr(new_cell, prop))
+            new_signals = calculate_cell_signals(cell, ch_list=self.ch_list)
+            cell.signals = new_signals
+
+            # add tag
+            cell.tags = {"modified": "True"}
+            self.session.commit()
+
+        else:
+            self.viewer.status = (
+                f"Error - Multiple cells found for {active_cell} at {frame}."
+            )
+
+        self.viewer.status = f"Cell {active_cell} from frame {frame} saved."
+
+        # force graph update
+        self.viewer.layers["Labels"].selected_label = 0
+        self.viewer.layers["Labels"].selected_label = active_cell
 
     def get_cell_properties(self):
         """

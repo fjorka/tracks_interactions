@@ -461,6 +461,48 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def add_CellDB_to_DB(viewer):
+    """
+    Function to add a cell to the database.
+    """
+
+    current_label = viewer.layers["Labels"].selected_label
+    frame = viewer.dims.current_step[0]
+
+    corner_pixels = viewer.layers["Labels"].corner_pixels
+
+    sc_r_start = corner_pixels[0, 1]
+    sc_r_stop = corner_pixels[1, 1]
+    sc_c_start = corner_pixels[0, 2]
+    sc_c_stop = corner_pixels[1, 2]
+
+    visible_labels = viewer.layers["Labels"].data[
+        frame, sc_r_start:sc_r_stop, sc_c_start:sc_c_stop
+    ]
+
+    # start the object
+    cell = CellDB(id=current_label, t=frame, track_id=current_label)
+
+    # get properties
+    coords = np.argwhere(visible_labels == current_label)
+    rmin, cmin = coords.min(axis=0)
+    rmax, cmax = coords.max(axis=0)
+
+    coords_mean = coords.mean(axis=0)
+    cell.row = int(coords_mean[0] + sc_r_start)
+    cell.col = int(coords_mean[1] + sc_c_start)
+
+    cell.bbox_0 = int(rmin + sc_r_start)
+    cell.bbox_1 = int(cmin + sc_c_start)
+    cell.bbox_2 = int(rmax + sc_r_start + 1)
+    cell.bbox_3 = int(cmax + sc_c_start + 1)
+
+    roi = visible_labels[rmin : rmax + 1, cmin : cmax + 1]
+    cell.mask = roi == current_label
+
+    return cell
+
+
 def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
     """
     Function to calculate signals of a single cell.
