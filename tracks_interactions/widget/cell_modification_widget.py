@@ -104,9 +104,9 @@ class CellModificationWidget(QWidget):
                         _, _ = cut_trackDB(
                             self.session, child.track_id, child.t_begin
                         )
-                        self.session.commit(child)
+                        self.session.commit()
 
-                self.session.commit(track)
+                self.session.commit()
             else:
                 new_track = TrackDB(
                     track_id=active_cell,

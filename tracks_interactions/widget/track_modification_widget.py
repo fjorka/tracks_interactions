@@ -40,7 +40,7 @@ class TrackModificationWidget(QWidget):
         modification_row.setLayout(QGridLayout())
 
         # Create the first row widgets
-        labelT2 = QLabel("Active")
+        labelT2 = QLabel("active")
         self.T2_box = self.add_T_spinbox(self.labels.selected_label)
         arrowLabel = QLabel(
             "→", alignment=Qt.AlignCenter
@@ -72,17 +72,15 @@ class TrackModificationWidget(QWidget):
         self.cut_track_btn = self.add_cut_track_btn()
         self.merge_track_btn = self.add_merge_track_btn()
         self.connect_track_btn = self.add_connect_track_btn()
+        self.del_track_btn = self.add_del_track_btn()
+        self.new_track_btn = self.add_new_track_btn()
 
         # Add second row widgets to the layout
-        modification_row.layout().addWidget(
-            self.cut_track_btn, 1, 0, 1, 2
-        )  # Row 1, Column 0-1 (span 2 columns)
-        modification_row.layout().addWidget(
-            self.merge_track_btn, 1, 2, 1, 2
-        )  # Row 1, Column 2-3 (span 2 columns)
-        modification_row.layout().addWidget(
-            self.connect_track_btn, 1, 4
-        )  # Row 1, Column 4
+        modification_row.layout().addWidget(self.cut_track_btn, 1, 0)
+        modification_row.layout().addWidget(self.merge_track_btn, 1, 1)
+        modification_row.layout().addWidget(self.connect_track_btn, 1, 2)
+        modification_row.layout().addWidget(self.del_track_btn, 1, 3)
+        modification_row.layout().addWidget(self.new_track_btn, 1, 4)
 
         self.layout().addWidget(modification_row)
 
@@ -113,6 +111,8 @@ class TrackModificationWidget(QWidget):
         """
         self.labels.selected_label = self.T2_box.value()
 
+    ################################################################################################
+    ################################################################################################
     def add_cut_track_btn(self):
         """
         Add a button to cut tracks.
@@ -136,7 +136,7 @@ class TrackModificationWidget(QWidget):
         Function that performs all the changes after a track is cut.
         """
 
-        ################################################################################################
+        ############################################################################################
         # orient yourself - figure what is asked for
 
         # get the position in time
@@ -145,7 +145,7 @@ class TrackModificationWidget(QWidget):
         # get my label
         active_label = int(self.viewer.layers["Labels"].selected_label)
 
-        ################################################################################################
+        ############################################################################################
         # perform database operations
 
         # cut trackDB
@@ -156,6 +156,7 @@ class TrackModificationWidget(QWidget):
         # if cutting from mitosis
         if mitosis:
             # trigger family tree update
+            self.viewer.layers["Labels"].selected_label = 0
             self.viewer.layers["Labels"].selected_label = active_label
 
         # if cutting in the middle of a track
@@ -178,10 +179,64 @@ class TrackModificationWidget(QWidget):
         else:
             pass
 
-        ################################################################################################
+        ############################################################################################
         # change viewer status
         self.viewer.status = f"Track {active_label} has been cut."
 
+    ################################################################################################
+    ################################################################################################
+    def add_del_track_btn(self):
+        """
+        Add a button to cut tracks.
+        """
+        del_track_btn = QPushButton("Delete track")
+
+        del_track_btn.clicked.connect(self.del_track_function)
+
+        path_to_del_icon = r"../tracks_interactions/icons/icons8-delete-48.png"
+
+        icon = QIcon(path_to_del_icon)
+        del_track_btn.setIcon(icon)
+        del_track_btn.setText(None)
+
+        return del_track_btn
+
+    def del_track_function(self):
+        """
+        Function that performs all the changes after a track is deleted
+        """
+
+        ############################################################################################
+        # orient yourself - figure what is asked for
+
+        # get my label
+        active_label = int(self.viewer.layers["Labels"].selected_label)
+
+        ############################################################################################
+        # perform database operations
+
+        # delete trackDB
+        status = fdb.delete_trackDB(self.session, active_label)
+
+        if status != "Track not found":
+            track_bbox = fdb.modify_track_cellsDB(
+                self.session,
+                active_label,
+                current_frame=None,
+                new_track=None,
+                direction="all",
+            )
+
+            # modify labels
+            modify_labels(self.viewer, track_bbox, active_label, 0)
+
+            # trigger family tree update
+            self.viewer.layers["Labels"].selected_label = 0
+
+        self.viewer.status = status
+
+    ################################################################################################
+    ################################################################################################
     def add_merge_track_btn(self):
         """
         Add a button to merge two tracks.
@@ -189,6 +244,12 @@ class TrackModificationWidget(QWidget):
         merge_track_btn = QPushButton("M")
 
         merge_track_btn.clicked.connect(self.merge_track_function)
+
+        path_to_merge_icon = r"../tracks_interactions/icons/icons8-link-50.png"
+
+        icon = QIcon(path_to_merge_icon)
+        merge_track_btn.setIcon(icon)
+        merge_track_btn.setText(None)
 
         return merge_track_btn
 
@@ -248,6 +309,8 @@ class TrackModificationWidget(QWidget):
         self.T2_box.setValue(t2)
         self.viewer.status = f"Track {t2} has been merged to {t1}. Track {t1_after} has been created."
 
+    ################################################################################################
+    ################################################################################################
     def add_connect_track_btn(self):
         """
         Add a button to connect two tracks.
@@ -255,6 +318,14 @@ class TrackModificationWidget(QWidget):
         connect_track_btn = QPushButton("C")
 
         connect_track_btn.clicked.connect(self.connect_track_function)
+
+        path_to_con_icon = (
+            r"../tracks_interactions/icons/icons8-connect-50.png"
+        )
+
+        icon = QIcon(path_to_con_icon)
+        connect_track_btn.setIcon(icon)
+        connect_track_btn.setText(None)
 
         return connect_track_btn
 
@@ -292,7 +363,7 @@ class TrackModificationWidget(QWidget):
             return
 
         if t1_after is not None:
-            # modify cellsDB of t1_before
+            # modify cellsDB of t1_after
             track_bbox_t1 = fdb.modify_track_cellsDB(
                 self.session, t1, curr_fr, t1_after, direction="after"
             )
@@ -323,4 +394,34 @@ class TrackModificationWidget(QWidget):
             self.viewer.status = f"Track {t2} has been connected to {t1}."
 
         # trigger family tree update
-        self.viewer.layers["Labels"].selected_label = t1
+        self.labels.selected_label = 0
+        self.labels.selected_label = t2
+
+    ################################################################################################
+    ################################################################################################
+    def add_new_track_btn(self):
+        """
+        Add a button to connect two tracks.
+        """
+        new_track_btn = QPushButton("N")
+
+        new_track_btn.clicked.connect(self.new_track_function)
+
+        path_to_new_icon = r"../tracks_interactions/icons/icons8-add-64.png"
+
+        icon = QIcon(path_to_new_icon)
+        new_track_btn.setIcon(icon)
+        new_track_btn.setText(None)
+
+        return new_track_btn
+
+    def new_track_function(self):
+        """
+        Function that performs all the changes after a track is connected.
+        Track
+        """
+
+        new_track = fdb.newTrack_number(self.session)
+        self.labels.selected_label = new_track
+
+        self.viewer.status = f"You can start track {new_track}."

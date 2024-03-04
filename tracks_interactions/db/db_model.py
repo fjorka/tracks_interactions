@@ -24,7 +24,7 @@ class CellDB(Base):
     track_id = Column(Integer, ForeignKey("tracks.track_id"), primary_key=True)
     t = Column(Integer, primary_key=True)
 
-    id = Column(BigInteger, unique=True)
+    id = Column(BigInteger)
 
     row = Column(Integer)
     col = Column(Integer)

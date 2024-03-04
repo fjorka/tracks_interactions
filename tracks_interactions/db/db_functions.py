@@ -68,6 +68,38 @@ def get_descendants(session, active_label):
     return descendants
 
 
+def delete_trackDB(session, active_label):
+    """
+    Function to delete a track from trackDB.
+    input:
+        session
+        active_label - label for which the track is cut
+    """
+
+    # get the acual track and check what will be done
+    record = session.query(TrackDB).filter_by(track_id=active_label).first()
+
+    # if the track is found
+    if record is not None:
+        # delete the track
+        session.delete(record)
+
+        # process descendants
+        descendants = get_descendants(session, active_label)
+        for track in descendants:
+            if track.parent_track_id == active_label:
+                cut_trackDB(session, track.track_id, track.t_begin)
+
+        session.commit()
+
+        status = f"Track {active_label} has been deleted."
+
+    else:
+        status = "Track not found"
+
+    return status
+
+
 def cut_trackDB(session, active_label, current_frame):
     """
     Function to cut a track in trackDB.
@@ -269,8 +301,10 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
         descendants = get_descendants(session, t1.track_id)
 
         for track in descendants[1:]:
-            # change for children
-            if track.parent_track_id == t1.track_id:
+            # cut off the children if they start at a different time
+            if (track.parent_track_id == t1.track_id) and (
+                track.t_begin != current_frame
+            ):
                 # this route will call descendants twice but I expect it to be rare
                 _, _ = cut_trackDB(session, track.track_id, track.t_begin)
 
@@ -354,17 +388,26 @@ def modify_track_cellsDB(
             .order_by(CellDB.t)
             .all()
         )
+    elif direction == "all":
+        query = (
+            session.query(CellDB).filter(CellDB.track_id == active_label).all()
+        )
     else:
-        raise ValueError("Direction should be 'before' or 'after'.")
+        raise ValueError("Direction should be 'all', 'before' or 'after'.")
 
     assert len(query) > 0, "No cells found for the given track"
 
-    # change track_ids for the cells
-    for cell in query:
-        cell.track_id = new_track
-
     # get the track_bbox
     track_bbox = _get_track_bbox(query)
+
+    # change track_ids
+    if new_track is not None:
+        for cell in query:
+            cell.track_id = new_track
+    # or delete the cells
+    else:
+        for cell in query:
+            session.delete(cell)
 
     session.commit()
 
