@@ -90,52 +90,61 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             x_val = mouse_point.x()
             y_val = mouse_point.y()
 
-            # right click - moving in time
-            if event.button() == Qt.RightButton:
-                pass
-                # self.viewer.status = (
-                #     f"Right click at {x_val}, {y_val}. Not implemented."
-                # )
+            ############################################################
+            # find which track was selected
+            dist = float("inf")
+            selected_n = None
 
-            # left click - selection of a track
-            elif event.button() == Qt.LeftButton:
+            if self.tree is not None:
+                for n in self.tree.traverse():
+                    if n.is_root():
+                        pass
+                    else:
+                        # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
+                        if (n.start <= x_val) and (n.stop >= x_val):
+                            dist_track = abs(n.y - y_val)
+                            if dist_track < dist:
+                                dist = dist_track
+                                selected_n = n
+            ############################################################
+
+            if event.button() == Qt.LeftButton:
                 # move in time
                 self.viewer.dims.set_point(0, round(x_val))
-                event.accept()
 
-                # make a track active
-                dist = float("inf")
-                selected_n = None
+                # capture if it tries to get attribute from None
+                try:
+                    self.viewer.status = f"Selected track: {selected_n.name}"
+                    self.labels.selected_label = selected_n.name
 
-                if self.tree is not None:
-                    for n in self.tree.traverse():
-                        if n.is_root():
-                            pass
-                        else:
-                            # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
-                            if (n.start <= x_val) and (n.stop >= x_val):
-                                dist_track = abs(n.y - y_val)
-                                if dist_track < dist:
-                                    dist = dist_track
-                                    selected_n = n
+                    # center the cell
+                    self.center_object_core_function()
 
-                    # capture if it tries to get attribute from None
-                    try:
-                        self.viewer.status = (
-                            f"Selected track: {selected_n.name}"
-                        )
-                        self.labels.selected_label = selected_n.name
+                except AttributeError:
+                    print(
+                        f"Click at {scene_coords.x()},{scene_coords.x()} translated to {x_val}, {y_val}"
+                    )
 
-                        # center the cell
-                        self.center_object_core_function()
+            # right click - change of status
+            elif event.button() == Qt.RightButton:
+                if selected_n is not None:
+                    # flip the status
+                    track = (
+                        self.session.query(TrackDB)
+                        .filter(TrackDB.track_id == selected_n.name)
+                        .first()
+                    )
+                    track.accepted_tag = not track.accepted_tag
+                    self.session.commit()
 
-                    except AttributeError:
-                        print(
-                            f"Click at {scene_coords.x()},{scene_coords.x()} translated to {x_val}, {y_val}"
-                        )
+                    # update the tree
+                    self.update_lineage_display()
 
-                else:
-                    self.viewer.status = "No tree to select from."
+                    # update viewer status
+                    self.viewer.status = f"Track {selected_n.name} accepted status: {track.accepted_tag}."
+
+        else:
+            self.viewer.status = "No tree to select from."
 
     def update_family_line(self):
         """
@@ -214,21 +223,30 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                 y_max = np.max([n.y, y_max])
 
                 label_color = self.labels.get_color(node_name)
-                if node_name == active_label:
-                    pen = mkPen(
-                        color=mkColor((label_color * 255).astype(int)), width=5
-                    )
-
-                else:
-                    label_color[-1] = 0.6
+                if n.name == active_label:
                     pen = mkPen(
                         color=mkColor((label_color * 255).astype(int)), width=4
                     )
+
+                else:
+                    label_color[-1] = 0.4
+                    pen = mkPen(
+                        color=mkColor((label_color * 255).astype(int)), width=2
+                    )
+                if n.accepted is False:
                     pen.setStyle(Qt.DotLine)
 
                 self.plot_view.plot(x_signal, y_signal, pen=pen)
 
-                text_item = TextItem(str(node_name), anchor=(1, 1))
+                # add text
+                if n.accepted is True:
+                    text_item = TextItem(
+                        str(node_name), anchor=(1, 1), color="green"
+                    )
+
+                else:
+                    text_item = TextItem(str(node_name), anchor=(1, 1))
+
                 text_item.setPos(x2, n.y)
                 self.plot_view.addItem(text_item)
 
@@ -263,7 +281,12 @@ def _add_children(node, df, n=2):
 
     for _, row in children.iterrows():
         child_node = node.add_child(name=row["track_id"])
-        child_node.add_features(num=n, start=row["t_begin"], stop=row["t_end"])
+        child_node.add_features(
+            num=n,
+            start=row["t_begin"],
+            stop=row["t_end"],
+            accepted=row["accepted_tag"],
+        )
 
         n += 1
 
@@ -323,6 +346,7 @@ def build_Newick_tree(session, root_id):
         num=1,
         start=trunk_row["t_begin"].values[0],
         stop=trunk_row["t_end"].values[0],
+        accepted=trunk_row["accepted_tag"].values[0],
     )
 
     # add children
