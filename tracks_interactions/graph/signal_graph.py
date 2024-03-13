@@ -57,7 +57,7 @@ class SignalGraph(GraphicsLayoutWidget):
     def onMouseClick(self, event):
         """
         Mouse click event handler.
-        Left - selection of a time point
+        Left - selection of a time point in the movie.
         """
         vb = self.plot_view.vb
         scene_coords = event.scenePos()
@@ -66,7 +66,7 @@ class SignalGraph(GraphicsLayoutWidget):
             mouse_point = vb.mapSceneToView(scene_coords)
             x_val = mouse_point.x()
 
-            # right click - moving in time
+            # left click - moving in time
             if event.button() == Qt.LeftButton:
                 # move in time
                 self.viewer.dims.set_point(0, round(x_val))
