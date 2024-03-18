@@ -1,5 +1,8 @@
+import numpy as np
+from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (
-    QListWidget,
+    QComboBox,
+    QHBoxLayout,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -36,7 +39,14 @@ class AddListGraphWidget(QWidget):
 
 
 class ListGraphWidget(QWidget):
-    def __init__(self, napari_viewer, sql_session, signal_list=None):
+    def __init__(
+        self,
+        napari_viewer,
+        sql_session,
+        signal_list,
+        signal_sel_list=None,
+        color_sel_list=None,
+    ):
         super().__init__()
 
         self.setLayout(QVBoxLayout())
@@ -44,47 +54,118 @@ class ListGraphWidget(QWidget):
         self.viewer = napari_viewer
         self.session = sql_session
         self.signal_list = signal_list
+        self.signal_sel_list = signal_sel_list
+        self.color_sel_list = color_sel_list
 
-        self.list_widget = self.add_signal_list()
+        # account for incorrect signal and color list
+        if self.signal_sel_list is not None and (
+            len(self.signal_sel_list) != len(self.color_sel_list)
+        ):
+            self.viewer.status = (
+                "Signal list and color list have different lengths."
+            )
+            self.signal_sel_list = None
+            self.color_sel_list = None
 
+        # add graph
         self.graph = self.add_signal_graph()
 
-    def add_signal_list(self):
-        """
-        Add a list of signals to be displayed.
-        """
-        list_widget = QListWidget()
-        # Set selection mode to allow multiple items to be selected
-        list_widget.setSelectionMode(QListWidget.MultiSelection)
+        # add matching
+        if self.signal_sel_list is None:
+            self.addRowButton()
+        else:
+            for ind in range(len(self.signal_sel_list)):
+                status = "-" if (ind < len(self.signal_sel_list) - 1) else "+"
+                self.addRowButton(
+                    status, self.signal_sel_list[ind], self.color_sel_list[ind]
+                )
 
-        # Add items to the list
-        for sig in self.signal_list:  # Example items
-            list_widget.addItem(sig)
+            self.graph.update_signal_display()
 
-        list_widget.selectionModel().selectionChanged.connect(
-            self.onSelectionChanged
-        )
+    def addRowButton(self, status="+", signal=None, color=None):
+        # Create a new row
+        rowLayout = QHBoxLayout()
 
-        list_widget.setFixedHeight(20)
-        self.layout().addWidget(list_widget)
+        comboBox = self.createSignalComboBox(signal)
 
-        return list_widget
+        button = QPushButton(status)
+        button.clicked.connect(lambda: self.handleButtonClick(button))
 
-    def onSelectionChanged(self, selected, deselected):
-        """
-        Event handler for the selectionChanged signal.
-        """
-        # get what is selected and change the graph
-        self.graph.signal_list = [
-            item.text() for item in self.list_widget.selectedItems()
-        ]
+        rowLayout.addWidget(comboBox)
+        rowLayout.addWidget(button)
+
+        self.layout().addLayout(rowLayout)
+
+    def createSignalComboBox(self, signal=None):
+        comboBox = QComboBox()
+        for sig in self.signal_list:
+            comboBox.addItem(sig)
+
+        if signal is not None:
+            comboBox.setCurrentText(signal)
+
+        comboBox.activated[str].connect(self.onSelection)
+
+        return comboBox
+
+    def onSelection(self):
+        # update list of signals and colors
+        signal_sel_list = []
+        for i in range(1, self.layout().count()):
+            signal = self.layout().itemAt(i).itemAt(0).widget().currentText()
+            signal_sel_list.append(signal)
+        self.graph.signal_list = signal_sel_list
+        self.graph.color_list = generate_n_qcolors(len(signal_sel_list))
+        # update graph
         self.graph.update_signal_display()
+
+    def handleButtonClick(self, button):
+        if button.text() == "+":
+            self.addRowButton()
+            button.setText("-")
+        else:  # The button is a '-' button
+            self.removeRowButton(button)
+
+        self.onSelection()
+
+    def removeRowButton(self, button):
+        # Find the layout that contains the button and remove it
+        for i in range(1, self.layout().count()):
+            layout = self.layout().itemAt(i)
+            # Check if this is the layout to be removed
+            if layout.layout().indexOf(button) != -1:
+                self.clearLayout(layout.layout())
+                self.layout().removeItem(layout)
+                break
+
+    def clearLayout(self, layout):
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
     def add_signal_graph(self):
         """
         Add a signal graph
         """
-        graph_widget = SignalGraph(self.viewer, self.session)
+        graph_widget = SignalGraph(
+            self.viewer,
+            self.session,
+            legend_on=False,
+            selected_signals=self.signal_sel_list,
+            color_list=self.color_sel_list,
+        )
         self.layout().addWidget(graph_widget)
 
         return graph_widget
+
+
+def generate_n_qcolors(n):
+    colors = []
+    for i in np.linspace(0, 1, n, endpoint=False):
+        hue = int(i * 360)
+        color = QColor.fromHsv(hue, 255, 255)
+        colors.append(color)
+    return colors

@@ -10,7 +10,12 @@ from tracks_interactions.db.db_model import CellDB
 
 class SignalGraph(GraphicsLayoutWidget):
     def __init__(
-        self, viewer, session, selected_signals=None, color_list=None
+        self,
+        viewer,
+        session,
+        legend_on=True,
+        selected_signals=None,
+        color_list=None,
     ):
         super().__init__()
 
@@ -19,6 +24,7 @@ class SignalGraph(GraphicsLayoutWidget):
         self.session = session
         self.viewer = viewer
         self.labels = self.viewer.layers["Labels"]
+        self.legend_on = legend_on
         self.signal_list = selected_signals
         self.color_list = color_list
 
@@ -109,18 +115,19 @@ class SignalGraph(GraphicsLayoutWidget):
                 self.plot_view.getViewBox().XYAxes, True
             )
 
-            # add legend
-            legend = LegendItem(
-                offset=(70, 30)
-            )  # Offset for the position of the legend in the view
-            legend.setParentItem(self.plot_view.graphicsItem())
+            if self.legend_on:
+                legend = LegendItem(
+                    offset=(70, 30)
+                )  # Offset for the position of the legend in the view
+                legend.setParentItem(self.plot_view.graphicsItem())
 
             for sig, col in zip(self.signal_list, self.color_list):
                 y_signal = [x[1][sig] for x in query]
                 pl = self.plot_view.plot(
                     x_signal, y_signal, pen=mkPen(color=col, width=2), name=sig
                 )
-                legend.addItem(pl, sig)
+                if self.legend_on:
+                    legend.addItem(pl, sig)
 
         else:
             self.viewer.status = "Error - no such label in the database."
