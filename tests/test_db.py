@@ -95,7 +95,7 @@ def db_session():
 
 def test_starting_db(db_session):
     """Verify that the test database is set up correctly."""
-    assert db_session.query(TrackDB).filter_by(track_id=15854).one()
+    assert db_session.query(TrackDB).filter_by(track_id=37401).one()
 
 
 def test_adding_track(db_session):
@@ -114,7 +114,7 @@ def test_newTrack_number(db_session):
     """Test - getting a new track number."""
 
     new_track = newTrack_number(db_session)
-    assert new_track == 17182
+    assert new_track == 37404
 
     new_track_number = 6e10
     new_track = TrackDB(
@@ -135,7 +135,7 @@ def test_get_descendants(db_session):
     """Test checking we get correct descendants."""
 
     # test at the root level
-    active_label = 15854
+    active_label = 37401
     descendants = get_descendants(db_session, active_label)
 
     assert len(descendants) == 3
@@ -143,7 +143,7 @@ def test_get_descendants(db_session):
     descendants_list = [x.track_id for x in descendants]
     descendants_list.sort()
     assert descendants[0].track_id == active_label
-    assert descendants_list == [15854, 15855, 15856]
+    assert descendants_list == [37401, 37402, 37403]
 
     # test lower in the tree
     active_label = 3
@@ -259,7 +259,7 @@ def test_cut_trackDB_mitosis(db_session):
     Test cut_TrackDB function when cutting from mitosis.
     """
 
-    active_label = 17175
+    active_label = 37402
 
     record = db_session.query(TrackDB).filter_by(track_id=active_label).one()
 
@@ -315,14 +315,14 @@ def test_cut_trackDB_mitosis(db_session):
 def test_modify_track_cellsDB_after(db_session):
     """Test checking whether the modify_track_cellsDB function works correctly."""
 
-    active_label = 15854
+    active_label = 20422
 
     # check how long the track is before the cut
     org_stop = (
         db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
     )
 
-    current_frame = 5
+    current_frame = 3
     new_track = 100
 
     _ = modify_track_cellsDB(
@@ -344,7 +344,7 @@ def test_modify_track_cellsDB_after(db_session):
 def test_modify_track_cellsDB_before(db_session):
     """Test checking whether the modify_track_cellsDB function works correctly."""
 
-    active_label = 15854
+    active_label = 20422
 
     # check how long the track is before the cut
     org_stop = (
@@ -358,7 +358,7 @@ def test_modify_track_cellsDB_before(db_session):
         db_session, active_label, current_frame, new_track, direction="before"
     )
 
-    # assert that there are only 5 objects of old track in the cell table after cut
+    # assert that there are only n objects of old track in the cell table after cut
     assert len(
         db_session.query(CellDB).filter_by(track_id=active_label).all()
     ) == (org_stop - current_frame + 1)
@@ -424,7 +424,7 @@ def test_double_cut_merge(db_session):
     """Test merging tracks when both need to be cut."""
 
     t1_ind = 1
-    t2_ind = 15854
+    t2_ind = 20422
     current_frame = 5
 
     expected_new_track = newTrack_number(db_session)
@@ -488,9 +488,9 @@ def test_double_cut_merge(db_session):
 def test_after_t1_end_track_merge(db_session):
     """ """
 
-    t1_ind = 15854
-    t2_ind = 17179
-    current_frame = 85
+    t1_ind = 37401
+    t2_ind = 20422
+    current_frame = 40
 
     expected_new_track = newTrack_number(db_session)
 
@@ -566,8 +566,8 @@ def test_before_t2_start_track_merge(db_session):
     """Test checking if a freely floating track can be merged.
     No descendants on neither side."""
 
-    t1_ind = 15854
-    t2_ind = 17179
+    t1_ind = 20422
+    t2_ind = 37401
     current_frame = 20
 
     expected_new_track = newTrack_number(db_session)
@@ -697,9 +697,9 @@ def test_freely_floating_connect(db_session):
 def test_double_cut_connect(db_session):
     """Test merging tracks when both need to be cut."""
 
-    t1_ind = 15856
-    t2_ind = 17175
-    current_frame = 60
+    t1_ind = 37401
+    t2_ind = 20422
+    current_frame = 30
 
     expected_t1_after = newTrack_number(db_session)
     expected_t2_before = newTrack_number(db_session) + 1
@@ -764,4 +764,7 @@ def test_double_cut_connect(db_session):
     assert t2_before.t_begin == t2.t_begin
     assert t2_before.t_end == current_frame - 1
     assert t2_before.parent_track_id == t2.parent_track_id
-    assert t2_before.root == t2.root
+    if t2.parent_track_id == -1:
+        assert t2_before.root == t2_before.track_id
+    else:
+        assert t2_before.root == t2.root

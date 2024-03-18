@@ -167,7 +167,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             self.plot_view.removeItem(item)
 
         # get an active label
-        active_label = int(self.viewer.layers["Labels"].selected_label)
+        active_label = int(self.labels.selected_label)
 
         # check if the label is in the database
         query = (
@@ -199,7 +199,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         """
 
         y_max = 1
-        active_label = int(self.viewer.layers["Labels"].selected_label)
+        active_label = int(self.labels.selected_label)
 
         # render the tree
         t_rendering = t.render(".")
@@ -223,17 +223,17 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                 y_max = np.max([n.y, y_max])
 
                 label_color = self.labels.get_color(node_name)
-                if n.name == active_label:
-                    pen = mkPen(
-                        color=mkColor((label_color * 255).astype(int)), width=4
-                    )
 
+                if n.name == active_label:
+                    pen_color = mkColor((label_color * 255).astype(int))
+                    pen = mkPen(color=pen_color, width=4)
                 else:
                     label_color[-1] = 0.4
-                    pen = mkPen(
-                        color=mkColor((label_color * 255).astype(int)), width=2
-                    )
+                    pen_color = mkColor((label_color * 255).astype(int))
+                    pen = mkPen(color=pen_color, width=2)
+
                 if n.accepted is False:
+                    self.viewer.status = "Track is not accepted."
                     pen.setStyle(Qt.DotLine)
 
                 self.plot_view.plot(x_signal, y_signal, pen=pen)
@@ -346,7 +346,7 @@ def build_Newick_tree(session, root_id):
         num=1,
         start=trunk_row["t_begin"].values[0],
         stop=trunk_row["t_end"].values[0],
-        accepted=trunk_row["accepted_tag"].values[0],
+        accepted=bool(trunk_row["accepted_tag"].values[0]),
     )
 
     # add children

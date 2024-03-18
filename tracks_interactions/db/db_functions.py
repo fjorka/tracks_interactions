@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import dask.array as da
 import numpy as np
+import tensorstore as ts
 from skimage.transform import resize
 from sqlalchemy import and_
 from sqlalchemy.orm import aliased
@@ -189,6 +190,9 @@ def _merge_t2(session, t2, t1, current_frame):
         current_frame - current time point
     """
 
+    # process descendants
+    descendants = get_descendants(session, t2.track_id)
+
     # if there is remaining part at the beginning
     if t2.t_begin < current_frame:
         t2.t_end = current_frame - 1
@@ -196,9 +200,6 @@ def _merge_t2(session, t2, t1, current_frame):
     # the t2 track in merge stops existing
     else:
         session.delete(t2)
-
-    # process descendants
-    descendants = get_descendants(session, t2.track_id)
 
     for track in descendants[1:]:
         # change the value of the root track
@@ -428,6 +429,9 @@ def add_CellDB_to_DB(viewer):
     visible_labels = viewer.layers["Labels"].data[
         frame, sc_r_start:sc_r_stop, sc_c_start:sc_c_stop
     ]
+
+    if type(viewer.layers["Labels"].data) == ts.TensorStore:
+        visible_labels = visible_labels.read().result()
 
     # start the object
     cell = CellDB(id=current_label, t=frame, track_id=current_label)

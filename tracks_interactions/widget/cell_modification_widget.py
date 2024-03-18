@@ -121,27 +121,24 @@ class CellModificationWidget(QWidget):
         # cell modification
         elif len(cell_list) == 1:
             cell = cell_list[0]
-            new_cell = add_CellDB_to_DB(self.viewer)
-            properties = [
-                "track_id",
-                "t",
-                "row",
-                "col",
-                "bbox_0",
-                "bbox_1",
-                "bbox_2",
-                "bbox_3",
-                "mask",
-                "tags",
-            ]
-            self.viewer.status = f"Modifying cell {active_cell} at {frame}."
-            for prop in properties:
-                setattr(cell, prop, getattr(new_cell, prop))
-            new_signals = calculate_cell_signals(cell, ch_list=self.ch_list)
-            cell.signals = new_signals
 
-            # add tag
-            cell.tags = {"modified": "True"}
+            # prepare tags
+            tags = cell.tags
+            if tags is not None:
+                tags["modified"] = "True"
+            else:
+                tags = {"modified": "True"}
+
+            #  create CellDB
+            new_cell = add_CellDB_to_DB(self.viewer)
+            new_cell.tags = tags
+
+            # add signals to the new cell
+            signals = calculate_cell_signals(new_cell, ch_list=self.ch_list)
+            new_cell.signals = signals
+
+            self.session.delete(cell)
+            self.session.add(new_cell)
             self.session.commit()
 
         else:
@@ -152,7 +149,7 @@ class CellModificationWidget(QWidget):
         self.viewer.status = f"Cell {active_cell} from frame {frame} saved."
 
         # force graph update
-        self.viewer.layers["Labels"].selected_label = 0
+        self.viewer.layers["Labels"].selected_label = -1
         self.viewer.layers["Labels"].selected_label = active_cell
 
     def get_cell_properties(self):

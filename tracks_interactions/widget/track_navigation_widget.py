@@ -1,3 +1,4 @@
+import tensorstore as ts
 from qtpy.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -46,13 +47,13 @@ class TrackNavigationWidget(QWidget):
         """
         if event.button == 2:
             # look up cursor position
-            x = int(self.viewer.cursor.position[1])
-            y = int(self.viewer.cursor.position[2])
+            position = tuple([int(x) for x in self.viewer.cursor.position])
 
             # check which cell was clicked
-            myTrackNum = self.labels.data[
-                self.viewer.dims.current_step[0], x, y
-            ]
+            myTrackNum = self.labels.data[position]
+
+            if type(self.labels.data) == ts.TensorStore:
+                myTrackNum = int(myTrackNum.read().result())
 
             # set track as active
             self.labels.selected_label = int(myTrackNum)
