@@ -1,8 +1,4 @@
-from pyqtgraph import (
-    GraphicsLayoutWidget,
-    LegendItem,
-    mkPen,
-)
+from pyqtgraph import GraphicsLayoutWidget, LegendItem, TextItem, mkPen
 from qtpy.QtCore import Qt
 
 from tracks_interactions.db.db_model import CellDB
@@ -16,6 +12,7 @@ class SignalGraph(GraphicsLayoutWidget):
         legend_on=True,
         selected_signals=None,
         color_list=None,
+        tag_dictionary=None,
     ):
         super().__init__()
 
@@ -27,11 +24,13 @@ class SignalGraph(GraphicsLayoutWidget):
         self.legend_on = legend_on
         self.signal_list = selected_signals
         self.color_list = color_list
+        if tag_dictionary is None:
+            self.tag_dictionary = {}
+        else:
+            self.tag_dictionary = tag_dictionary
 
         # initialize graph
-        self.plot_view = self.addPlot(
-            title="Signal", labels={"bottom": "Time"}
-        )
+        self.plot_view = self.addPlot(title="", labels={"bottom": "Time"})
 
         self.t_max = self.viewer.dims.range[0][1]
         self.plot_view.setXRange(0, self.t_max)
@@ -45,10 +44,10 @@ class SignalGraph(GraphicsLayoutWidget):
         self.time_line = self.add_time_line()
 
         # connect time slider event
-        self.viewer.dims.events.current_step.connect(self.update_family_line)
+        self.viewer.dims.events.current_step.connect(self.update_time_line)
 
         # connect label selection event
-        self.labels.events.selected_label.connect(self.update_signal_display)
+        self.labels.events.selected_label.connect(self.update_graph_all)
 
     def add_time_line(self):
         """
@@ -77,38 +76,87 @@ class SignalGraph(GraphicsLayoutWidget):
                 # move in time
                 self.viewer.dims.set_point(0, round(x_val))
 
-    def update_family_line(self):
+    def update_time_line(self):
         """
-        Update of the family line when slider position is moved.
+        Update of the time line when slider position is moved.
         """
         # line_position = event.value # that emitts warning for reasons that I don't understand
         line_position = self.viewer.dims.current_step[0]
         self.time_line.setValue(line_position)
 
-    def update_signal_display(self):
+    def get_db_info(self):
         """
-        Update of the signal display when a new label is selected.
+        Get information about the cell from the database.
         """
-
-        # Clear all elements except the time line
-        items_to_remove = self.plot_view.items[
-            1:
-        ]  # Get all items except the time line
-        for item in items_to_remove:
-            self.plot_view.removeItem(item)
-
         # get an active label
-        active_label = int(self.viewer.layers["Labels"].selected_label)
+        self.active_label = int(self.viewer.layers["Labels"].selected_label)
 
-        # check if the label is in the database
-        query = (
-            self.session.query(CellDB.t, CellDB.signals)
-            .filter(CellDB.track_id == active_label)
+        # get the info
+        self.query = (
+            self.session.query(CellDB.t, CellDB.signals, CellDB.tags)
+            .filter(CellDB.track_id == self.active_label)
             .order_by(CellDB.t)
             .all()
         )
-        if query is not None:
-            x_signal = [x[0] for x in query]
+
+    def redraw_tags(self):
+        """
+        Function that updates taggs on the graph.
+        """
+
+        # remove previous tags
+        items_to_remove = [
+            x for x in self.plot_view.items if isinstance(x, TextItem)
+        ]
+        for item in items_to_remove:
+            self.plot_view.removeItem(item)
+
+        # reset view
+        self.plot_view.enableAutoRange(
+            self.plot_view.getViewBox().XYAxes, True
+        )
+
+        y_view_range = self.plot_view.viewRange()[1]
+        y_range = y_view_range[1] - y_view_range[0]
+        row_height = 0.1 * y_range
+
+        # add tags
+        if len(self.query) > 0:
+            if len(self.tag_dictionary) > 0:
+                sorted_tags = self.tag_dictionary.items()
+                for index, (tag, tag_mark) in enumerate(sorted_tags):
+                    x_list = [
+                        item[0]
+                        for item in self.query
+                        if (
+                            item[2].get(tag) == "True"
+                            or item[2].get(tag) is True
+                        )
+                    ]
+                    if x_list:
+                        y = y_view_range[1] + (index * row_height)
+                        for x in x_list:
+                            text = TextItem(text=tag_mark, anchor=(0.5, 0))
+                            self.plot_view.addItem(text)
+                            text.setPos(x, y)
+            else:
+                self.viewer.status = "No tags to display."
+
+        else:
+            self.viewer.status = "Error - no such label in the database."
+
+    def redraw_signals(self):
+        """
+        Function that updates signals on the graph.
+        """
+
+        # remove previous signals
+        items_to_remove = self.plot_view.items[1:]
+        for item in items_to_remove:
+            self.plot_view.removeItem(item)
+
+        if len(self.query) > 0:
+            x_signal = [x[0] for x in self.query]
 
             # reset view
             self.plot_view.enableAutoRange(
@@ -122,12 +170,37 @@ class SignalGraph(GraphicsLayoutWidget):
                 legend.setParentItem(self.plot_view.graphicsItem())
 
             for sig, col in zip(self.signal_list, self.color_list):
-                y_signal = [x[1][sig] for x in query]
-                pl = self.plot_view.plot(
-                    x_signal, y_signal, pen=mkPen(color=col, width=2), name=sig
-                )
-                if self.legend_on:
-                    legend.addItem(pl, sig)
-
+                if sig is not None:
+                    y_signal = [x[1][sig] for x in self.query]
+                    pl = self.plot_view.plot(
+                        x_signal,
+                        y_signal,
+                        pen=mkPen(color=col, width=2),
+                        name=sig,
+                    )
+                    if self.legend_on:
+                        legend.addItem(pl, sig)
         else:
             self.viewer.status = "Error - no such label in the database."
+
+    def update_tags(self):
+        """
+        Update of the tags on the graph.
+        """
+        self.get_db_info()
+        self.redraw_tags()
+
+    def update_signals(self):
+        """
+        Update of the signals on the graph.
+        """
+        self.get_db_info()
+        self.redraw_signals()
+
+    def update_graph_all(self):
+        """
+        Update of the signal display when a new label is selected.
+        """
+        self.get_db_info()
+        self.redraw_signals()
+        self.redraw_tags()

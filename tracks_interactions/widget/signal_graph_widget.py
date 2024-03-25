@@ -1,13 +1,14 @@
-import numpy as np
-from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (
+    QColorDialog,
     QComboBox,
     QHBoxLayout,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
+from sqlalchemy.orm.attributes import flag_modified
 
+from tracks_interactions.db.db_model import CellDB
 from tracks_interactions.graph.signal_graph import SignalGraph
 
 
@@ -32,13 +33,13 @@ class AddListGraphWidget(QWidget):
         if self.signal_list is None:
             self.viewer.status = "No signal list provided."
         else:
-            list_graph_widget = ListGraphWidget(
+            list_graph_widget = CellGraphWidget(
                 self.viewer, self.session, signal_list=self.signal_list
             )
             self.viewer.window.add_dock_widget(list_graph_widget, area="right")
 
 
-class ListGraphWidget(QWidget):
+class CellGraphWidget(QWidget):
     def __init__(
         self,
         napari_viewer,
@@ -46,16 +47,23 @@ class ListGraphWidget(QWidget):
         signal_list,
         signal_sel_list=None,
         color_sel_list=None,
+        tag_dictionary=None,
     ):
         super().__init__()
+
+        if tag_dictionary is None:
+            tag_dictionary = {}
 
         self.setLayout(QVBoxLayout())
 
         self.viewer = napari_viewer
+        self.labels = self.viewer.layers["Labels"]
         self.session = sql_session
-        self.signal_list = signal_list
+        self.signal_list = [None] + signal_list
         self.signal_sel_list = signal_sel_list
         self.color_sel_list = color_sel_list
+        self.tag_dictionary = tag_dictionary
+        self.btn_offset = 1 if len(self.tag_dictionary) == 0 else 2
 
         # account for incorrect signal and color list
         if self.signal_sel_list is not None and (
@@ -70,7 +78,11 @@ class ListGraphWidget(QWidget):
         # add graph
         self.graph = self.add_signal_graph()
 
-        # add matching
+        if len(tag_dictionary) > 0:
+            self.add_tag_buttons()
+            self.add_tag_shortcuts()
+
+        # add matching buttons
         if self.signal_sel_list is None:
             self.addRowButton()
         else:
@@ -80,18 +92,88 @@ class ListGraphWidget(QWidget):
                     status, self.signal_sel_list[ind], self.color_sel_list[ind]
                 )
 
-            self.graph.update_signal_display()
+            # trigger graph update
+            self.graph.update_graph_all()
+
+    def add_tag_buttons(self):
+        rowLayout = QHBoxLayout()
+
+        for tag in self.tag_dictionary:
+            if tag != "modified":
+                button = QPushButton(tag)
+                button.clicked.connect(
+                    lambda _, b=button: self.handleTagButtonClick(
+                        annotation=b.text()
+                    )
+                )
+                rowLayout.addWidget(button)
+
+        self.layout().addLayout(rowLayout)
+
+    def add_tag_shortcuts(self):
+        """
+        Add shortcuts for tags.
+        """
+        for tag, sh_cut in self.tag_dictionary.items():
+            if tag != "modified":
+                self.viewer.bind_key(
+                    f"Shift+{sh_cut}",
+                    lambda viewer, annotation=tag: self.handleTagButtonClick(
+                        viewer, annotation=annotation
+                    ),
+                    overwrite=True,
+                )
+
+    def handleTagButtonClick(self, viewer=None, annotation=None):
+        """
+        Add a tag to the current cell.
+        """
+
+        active_cell = self.labels.selected_label
+        frame = self.viewer.dims.current_step[0]
+
+        cell_list = (
+            self.session.query(CellDB)
+            .filter(CellDB.t == frame)
+            .filter(CellDB.track_id == active_cell)
+            .all()
+        )
+
+        if len(cell_list) == 0:
+            self.viewer.status = "Error - no cell found at this frame."
+        elif len(cell_list) > 1:
+            self.viewer.status = (
+                f"Error - Multiple cells found for {active_cell} at {frame}."
+            )
+        else:
+            cell = cell_list[0]
+            tags = cell.tags
+
+            status = tags[annotation] if annotation in tags else False
+
+            tags[annotation] = not status
+
+            cell.tags = tags
+            flag_modified(cell, "tags")
+            self.session.commit()
+
+            # set status and update graph
+            self.viewer.status = f"Tag {annotation} was set to {not status}."
+            self.graph.update_tags()
 
     def addRowButton(self, status="+", signal=None, color=None):
         # Create a new row
         rowLayout = QHBoxLayout()
 
         comboBox = self.createSignalComboBox(signal)
+        colorButton = self.createColorButton(color)
 
         button = QPushButton(status)
+        button.setMaximumWidth(40)
         button.clicked.connect(lambda: self.handleButtonClick(button))
 
         rowLayout.addWidget(comboBox)
+        rowLayout.addWidget(colorButton)
         rowLayout.addWidget(button)
 
         self.layout().addLayout(rowLayout)
@@ -108,16 +190,53 @@ class ListGraphWidget(QWidget):
 
         return comboBox
 
+    def createColorButton(self, color=None):
+        colorButton = QPushButton()
+        colorButton.setMaximumWidth(40)  # Keep the button small
+        if color:
+            colorButton.setStyleSheet(f"background-color: {color}")
+        else:
+            colorButton.setStyleSheet("background-color: white")
+        colorButton.clicked.connect(lambda: self.selectColor(colorButton))
+
+        return colorButton
+
+    def selectColor(self, button):
+        # Open a color dialog and set the selected color as the button's background
+        color = QColorDialog.getColor()
+        if color.isValid():
+            button.setStyleSheet(f"background-color: {color.name()}")
+            self.onSelection()
+
     def onSelection(self):
         # update list of signals and colors
         signal_sel_list = []
-        for i in range(1, self.layout().count()):
+        color_sel_list = []
+
+        # get info about selected signals
+        for i in range(self.btn_offset, self.layout().count()):
+            self.viewer.status = "Selection changed1"
             signal = self.layout().itemAt(i).itemAt(0).widget().currentText()
             signal_sel_list.append(signal)
+            color = (
+                self.layout()
+                .itemAt(i)
+                .itemAt(1)
+                .widget()
+                .palette()
+                .button()
+                .color()
+                .name()
+            )
+            color_sel_list.append(color)
+        self.viewer.status = "Selection changed3"
         self.graph.signal_list = signal_sel_list
-        self.graph.color_list = generate_n_qcolors(len(signal_sel_list))
+        self.graph.color_list = color_sel_list
+
+        self.viewer.status = f"Selected signals: {signal_sel_list} with colors: {color_sel_list}"
+
         # update graph
-        self.graph.update_signal_display()
+        self.graph.update_graph_all()
 
     def handleButtonClick(self, button):
         if button.text() == "+":
@@ -156,16 +275,8 @@ class ListGraphWidget(QWidget):
             legend_on=False,
             selected_signals=self.signal_sel_list,
             color_list=self.color_sel_list,
+            tag_dictionary=self.tag_dictionary,
         )
         self.layout().addWidget(graph_widget)
 
         return graph_widget
-
-
-def generate_n_qcolors(n):
-    colors = []
-    for i in np.linspace(0, 1, n, endpoint=False):
-        hue = int(i * 360)
-        color = QColor.fromHsv(hue, 255, 255)
-        colors.append(color)
-    return colors

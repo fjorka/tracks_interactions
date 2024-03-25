@@ -210,7 +210,7 @@ class TrackModificationWidget(QWidget):
         # orient yourself - figure what is asked for
 
         # get my label
-        active_label = int(self.viewer.layers["Labels"].selected_label)
+        active_label = int(self.labels.selected_label)
 
         ############################################################################################
         # perform database operations
@@ -231,7 +231,7 @@ class TrackModificationWidget(QWidget):
             modify_labels(self.viewer, track_bbox, active_label, 0)
 
             # trigger family tree update
-            self.viewer.layers["Labels"].selected_label = 0
+            self.viewer.labels.selected_label = 0
 
         self.viewer.status = status
 
@@ -284,9 +284,6 @@ class TrackModificationWidget(QWidget):
             )
             return
 
-        # trigger family tree update
-        self.viewer.layers["Labels"].selected_label = t1
-
         if t1_after is not None:
             # modify cellsDB of t1
             track_bbox_t1 = fdb.modify_track_cellsDB(
@@ -306,8 +303,12 @@ class TrackModificationWidget(QWidget):
 
         ################################################################################################
         # change viewer status
-        self.T2_box.setValue(t2)
+        self.T2_box.setValue(t1)
+        self.T1_box.setValue(t2)
         self.viewer.status = f"Track {t2} has been merged to {t1}. Track {t1_after} has been created."
+
+        # trigger updates
+        self.labels.selected_label = t1
 
     ################################################################################################
     ################################################################################################
@@ -396,6 +397,10 @@ class TrackModificationWidget(QWidget):
         # trigger family tree update
         self.labels.selected_label = 0
         self.labels.selected_label = t2
+
+        # set T1 and T1
+        self.T2_box.setValue(t2)
+        self.T1_box.setValue(t1)
 
     ################################################################################################
     ################################################################################################

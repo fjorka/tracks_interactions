@@ -8,9 +8,8 @@ from pyqtgraph import (
     mkPen,
 )
 from qtpy.QtCore import Qt
-from sqlalchemy import and_
 
-from tracks_interactions.db.db_model import CellDB, TrackDB
+from tracks_interactions.db.db_model import TrackDB
 
 
 class FamilyGraphWidget(GraphicsLayoutWidget):
@@ -46,35 +45,6 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
         # connect label selection event
         self.labels.events.selected_label.connect(self.update_lineage_display)
-
-    # DUPLICATE from navigation - rethink
-    def center_object_core_function(self):
-        """
-        Center the object that exists on this frame.
-        """
-        # orient yourself
-        curr_tr = int(
-            self.labels.selected_label
-        )  # because numpy.int64 is not accepted by the database
-        curr_fr = self.viewer.dims.current_step[0]
-
-        # find the object
-        cell = (
-            self.session.query(CellDB)
-            .filter(and_(CellDB.track_id == curr_tr, CellDB.t == curr_fr))
-            .first()
-        )
-
-        if cell is not None:
-            # get the position
-            x = cell.row
-            y = cell.col
-
-            # move the camera
-            self.viewer.camera.center = (0, x, y)
-
-        else:
-            self.viewer.status = "No object in this frame."
 
     def onMouseClick(self, event):
         """
@@ -116,9 +86,6 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                 try:
                     self.viewer.status = f"Selected track: {selected_n.name}"
                     self.labels.selected_label = selected_n.name
-
-                    # center the cell
-                    self.center_object_core_function()
 
                 except AttributeError:
                     print(
@@ -233,7 +200,6 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                     pen = mkPen(color=pen_color, width=2)
 
                 if n.accepted is False:
-                    self.viewer.status = "Track is not accepted."
                     pen.setStyle(Qt.DotLine)
 
                 self.plot_view.plot(x_signal, y_signal, pen=pen)

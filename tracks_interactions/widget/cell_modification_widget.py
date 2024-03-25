@@ -124,10 +124,7 @@ class CellModificationWidget(QWidget):
 
             # prepare tags
             tags = cell.tags
-            if tags is not None:
-                tags["modified"] = "True"
-            else:
-                tags = {"modified": "True"}
+            tags["modified"] = True
 
             #  create CellDB
             new_cell = add_CellDB_to_DB(self.viewer)
@@ -149,7 +146,8 @@ class CellModificationWidget(QWidget):
         self.viewer.status = f"Cell {active_cell} from frame {frame} saved."
 
         # force graph update
-        self.viewer.layers["Labels"].selected_label = -1
+        # because this widget doesn't know about the graph and it cannot update is directly
+        self.viewer.layers["Labels"].selected_label = 0
         self.viewer.layers["Labels"].selected_label = active_cell
 
     def get_cell_properties(self):

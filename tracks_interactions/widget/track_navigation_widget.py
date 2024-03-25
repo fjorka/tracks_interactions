@@ -28,6 +28,8 @@ class TrackNavigationWidget(QWidget):
 
         # add checkbox for following the object
         self.follow_object_checkbox = self.add_follow_object_checkbox()
+        # set initial the default status to checked
+        self.follow_object_checkbox.setChecked(True)
 
     #########################################################
     # shortcuts

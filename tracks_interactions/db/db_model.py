@@ -40,7 +40,7 @@ class CellDB(Base):
     signals = Column(JSON, default=NO_SIGNAL)
 
     # JSON column for tags
-    tags = Column(JSON, default={})
+    tags = Column(JSON, default=NO_SIGNAL)
 
     def __repr__(self):
         return f"{self.id} from frame {self.t} with track_id {self.track_id} at ({self.row},{self.col})"
