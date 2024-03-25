@@ -46,7 +46,7 @@ class TrackModificationWidget(QWidget):
             "→", alignment=Qt.AlignCenter
         )  # Big arrow label, centered
         arrowLabel.setStyleSheet("font-size: 24px;")  # Making the arrow bigger
-        labelT1 = QLabel("to")
+        labelT1 = QLabel("upstream")
         self.T1_box = self.add_T_spinbox(self.labels.selected_label)
 
         # connect spinboxed to the event of changing the track
@@ -101,9 +101,10 @@ class TrackModificationWidget(QWidget):
         """
         Change the values of T1 and T2 spinboxes.
         """
-        prev_tr = self.T2_box.value()
-        self.T2_box.setValue(self.labels.selected_label)
-        self.T1_box.setValue(prev_tr)
+        if self.labels.selected_label != 0:
+            prev_tr = self.T2_box.value()
+            self.T2_box.setValue(self.labels.selected_label)
+            self.T1_box.setValue(prev_tr)
 
     def T2_change_function(self):
         """
@@ -128,6 +129,9 @@ class TrackModificationWidget(QWidget):
         icon = QIcon(path_to_cut_icon)
         cut_track_btn.setIcon(icon)
         cut_track_btn.setText(None)
+
+        # Set the tooltip for the merge track button
+        cut_track_btn.setToolTip("Cut the active track at the current frame.")
 
         return cut_track_btn
 
@@ -199,6 +203,9 @@ class TrackModificationWidget(QWidget):
         del_track_btn.setIcon(icon)
         del_track_btn.setText(None)
 
+        # Set the tooltip for the del track button
+        del_track_btn.setToolTip("Delete the active track.")
+
         return del_track_btn
 
     def del_track_function(self):
@@ -252,6 +259,9 @@ class TrackModificationWidget(QWidget):
         icon = QIcon(path_to_merge_icon)
         merge_track_btn.setIcon(icon)
         merge_track_btn.setText(None)
+
+        # Set the tooltip for the merge track button
+        merge_track_btn.setToolTip("Merge 'active' track to 'upstream' track.")
 
         return merge_track_btn
 
@@ -329,6 +339,11 @@ class TrackModificationWidget(QWidget):
         icon = QIcon(path_to_con_icon)
         connect_track_btn.setIcon(icon)
         connect_track_btn.setText(None)
+
+        # Set the tooltip for the merge track button
+        connect_track_btn.setToolTip(
+            "Make 'active' track an offspring of the 'upstream' track."
+        )
 
         return connect_track_btn
 
@@ -419,6 +434,9 @@ class TrackModificationWidget(QWidget):
         icon = QIcon(path_to_new_icon)
         new_track_btn.setIcon(icon)
         new_track_btn.setText(None)
+
+        # Set the tooltip for the button
+        new_track_btn.setToolTip("Get a new unique track number.")
 
         return new_track_btn
 

@@ -105,23 +105,24 @@ class TrackNavigationWidget(QWidget):
         )  # because numpy.int64 is not accepted by the database
         curr_fr = self.viewer.dims.current_step[0]
 
-        # find the object
-        cell = (
-            self.session.query(CellDB)
-            .filter(and_(CellDB.track_id == curr_tr, CellDB.t == curr_fr))
-            .first()
-        )
+        if curr_tr != 0:
+            # find the object
+            cell = (
+                self.session.query(CellDB)
+                .filter(and_(CellDB.track_id == curr_tr, CellDB.t == curr_fr))
+                .first()
+            )
 
-        if cell is not None:
-            # get the position
-            x = cell.row
-            y = cell.col
+            if cell is not None:
+                # get the position
+                x = cell.row
+                y = cell.col
 
-            # move the camera
-            self.viewer.camera.center = (0, x, y)
+                # move the camera
+                self.viewer.camera.center = (0, x, y)
 
-        else:
-            self.viewer.status = "No object in this frame."
+            else:
+                self.viewer.status = "No object in this frame."
 
     def center_object_function(self):
         """
