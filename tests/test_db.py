@@ -4,6 +4,7 @@ from sqlalchemy.orm import make_transient, sessionmaker
 
 from tracks_interactions.db.db_functions import (
     cut_trackDB,
+    delete_trackDB,
     get_descendants,
     integrate_trackDB,
     modify_track_cellsDB,
@@ -108,6 +109,39 @@ def test_adding_track(db_session):
 
     # Verify the record was added
     assert db_session.query(TrackDB).filter_by(track_id=100).one()
+
+
+def test_remove_track(db_session):
+    """Test - remove a track"""
+    to_del = 1
+    status = delete_trackDB(db_session, to_del)
+    assert status == f"Track {to_del} has been deleted."
+
+    # Verify the record was removed
+    assert not db_session.query(TrackDB).filter_by(track_id=to_del).all()
+
+    # Verify that the offspring has expected properties
+    offspring = db_session.query(TrackDB).filter_by(track_id=2).one()
+    assert offspring.parent_track_id == NO_PARENT
+    assert offspring.root == 2
+
+    offspring = db_session.query(TrackDB).filter_by(track_id=3).one()
+    assert offspring.parent_track_id == NO_PARENT
+    assert offspring.root == 3
+
+    # check grandchildren
+    grandchild = db_session.query(TrackDB).filter_by(track_id=4).one()
+    assert grandchild.parent_track_id == 3
+    assert grandchild.root == 3
+
+
+def test_remove_none_track(db_session):
+    """Test - remove a track"""
+    to_del = 6
+    init_len = db_session.query(TrackDB).all()
+    status = delete_trackDB(db_session, to_del)
+    assert status == "Track not found"
+    assert len(db_session.query(TrackDB).all()) == len(init_len)
 
 
 def test_newTrack_number(db_session):

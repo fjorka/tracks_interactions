@@ -78,14 +78,14 @@ def delete_trackDB(session, active_label):
 
     # if the track is found
     if record is not None:
-        # delete the track
-        session.delete(record)
-
         # process descendants
         descendants = get_descendants(session, active_label)
-        for track in descendants:
+        for track in [x for x in descendants if x.track_id != active_label]:
             if track.parent_track_id == active_label:
                 cut_trackDB(session, track.track_id, track.t_begin)
+
+        # delete the track
+        session.delete(record)
 
         session.commit()
 

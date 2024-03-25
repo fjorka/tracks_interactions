@@ -212,6 +212,8 @@ class TrackModificationWidget(QWidget):
         # get my label
         active_label = int(self.labels.selected_label)
 
+        # get yourself
+
         ############################################################################################
         # perform database operations
 
@@ -231,7 +233,7 @@ class TrackModificationWidget(QWidget):
             modify_labels(self.viewer, track_bbox, active_label, 0)
 
             # trigger family tree update
-            self.viewer.labels.selected_label = 0
+            self.labels.selected_label = 0
 
         self.viewer.status = status
 
