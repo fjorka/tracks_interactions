@@ -312,6 +312,69 @@ def test_cut_trackDB_mitosis(db_session):
     )
 
 
+def test_cut_merge_trackDB(db_session):
+    """Test checking that a track is modified correctly."""
+
+    active_label = 1
+    current_frame = 5
+
+    new_track_expected = newTrack_number(db_session)
+
+    mitosis, new_track = cut_trackDB(db_session, active_label, current_frame)
+
+    # assert expected output of the function
+    assert mitosis is False
+    assert new_track == new_track_expected
+
+    # re-merge new to old
+    t1_ind = 1
+    t2_ind = new_track
+    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+
+    # assert that the new track is in the database
+    assert (
+        len(db_session.query(TrackDB).filter_by(track_id=new_track).all()) == 0
+    )
+
+    # assert that the new track has expected properties
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=t1_ind).one().t_begin == 0
+    )
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=t1_ind).one().t_end == 10
+    )
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=t1_ind)
+        .one()
+        .parent_track_id
+        == -1
+    )
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=t1_ind).one().root
+        == t1_ind
+    )
+
+    # assert that the children are not modified
+    assert db_session.query(TrackDB).filter_by(track_id=2).one().root == t1_ind
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=2).one().parent_track_id
+        == t1_ind
+    )
+    assert db_session.query(TrackDB).filter_by(track_id=3).one().root == t1_ind
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=3).one().parent_track_id
+        == t1_ind
+    )
+
+    # assert that the grandchildren are not modified
+    assert db_session.query(TrackDB).filter_by(track_id=4).one().root == t1_ind
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=4).one().parent_track_id
+        == 3
+    )
+
+
 def test_modify_track_cellsDB_after(db_session):
     """Test checking whether the modify_track_cellsDB function works correctly."""
 

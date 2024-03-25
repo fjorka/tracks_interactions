@@ -40,9 +40,9 @@ class TrackNavigationWidget(QWidget):
         Initialize shortcuts for the widget.
         """
         # add a shortcut for right click selection
-        self.labels.mouse_drag_callbacks.append(self.select_label)
+        self.viewer.mouse_drag_callbacks.append(self.select_label)
 
-    def select_label(self, layer, event):
+    def select_label(self, viewer, event):
         """
         Select a label by right click.
         Works on any layer.

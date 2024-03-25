@@ -143,7 +143,7 @@ class TrackModificationWidget(QWidget):
         current_frame = self.viewer.dims.current_step[0]
 
         # get my label
-        active_label = int(self.viewer.layers["Labels"].selected_label)
+        active_label = int(self.labels.selected_label)
 
         ############################################################################################
         # perform database operations
@@ -156,8 +156,8 @@ class TrackModificationWidget(QWidget):
         # if cutting from mitosis
         if mitosis:
             # trigger family tree update
-            self.viewer.layers["Labels"].selected_label = 0
-            self.viewer.layers["Labels"].selected_label = active_label
+            self.labels.selected_label = 0
+            self.labels.selected_label = active_label
 
         # if cutting in the middle of a track
         elif new_track:

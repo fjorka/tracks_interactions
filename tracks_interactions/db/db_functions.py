@@ -163,7 +163,7 @@ def cut_trackDB(session, active_label, current_frame):
         # process descendants
         descendants = get_descendants(session, active_label)
 
-        for track in descendants[1:]:
+        for track in [x for x in descendants if x.track_id != active_label]:
             # change the value of the root track
             track.root = new_track
 
@@ -201,7 +201,8 @@ def _merge_t2(session, t2, t1, current_frame):
     else:
         session.delete(t2)
 
-    for track in descendants[1:]:
+    # for everyone except the t2 track
+    for track in [x for x in descendants if x.track_id != t2.track_id]:
         # change the value of the root track
         track.root = t1.root
 
@@ -294,10 +295,10 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
     elif t1.t_end < current_frame:
         t1_after = None
 
-        # if there is offsprint detach them as separate trees
+        # if there is t1 offsprint detach them as separate trees
         descendants = get_descendants(session, t1.track_id)
 
-        for track in descendants[1:]:
+        for track in [x for x in descendants if x.track_id != t1.track_id]:
             # cut off the children if they start at a different time
             if (track.parent_track_id == t1.track_id) and (
                 track.t_begin != current_frame
