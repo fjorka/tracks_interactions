@@ -1,3 +1,4 @@
+import numpy as np
 from pyqtgraph import GraphicsLayoutWidget, LegendItem, TextItem, mkPen
 from qtpy.QtCore import Qt
 
@@ -157,6 +158,17 @@ class SignalGraph(GraphicsLayoutWidget):
 
         if len(self.query) > 0:
             x_signal = [x[0] for x in self.query]
+            full_x_range = list(range(min(x_signal), max(x_signal) + 1))
+
+            y_signals = {
+                sig: [np.nan] * len(full_x_range) for sig in self.signal_list
+            }
+
+            for t, signals, _ in self.query:
+                index = full_x_range.index(t)
+                for sig in self.signal_list:
+                    if sig in signals:
+                        y_signals[sig][index] = signals[sig]
 
             # reset view
             self.plot_view.enableAutoRange(
@@ -171,10 +183,10 @@ class SignalGraph(GraphicsLayoutWidget):
 
             for sig, col in zip(self.signal_list, self.color_list):
                 if sig is not None:
-                    y_signal = [x[1][sig] for x in self.query]
+                    y_signal_with_gaps = y_signals[sig]
                     pl = self.plot_view.plot(
-                        x_signal,
-                        y_signal,
+                        full_x_range,
+                        y_signal_with_gaps,
                         pen=mkPen(color=col, width=2),
                         name=sig,
                     )
@@ -201,6 +213,7 @@ class SignalGraph(GraphicsLayoutWidget):
         """
         Update of the signal display when a new label is selected.
         """
-        self.get_db_info()
-        self.redraw_signals()
-        self.redraw_tags()
+        if self.labels.selected_label != 0:
+            self.get_db_info()
+            self.redraw_signals()
+            self.redraw_tags()

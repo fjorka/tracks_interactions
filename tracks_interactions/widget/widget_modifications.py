@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from sqlalchemy import desc
 
 import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
@@ -494,7 +495,8 @@ class ModificationWidget(QWidget):
         """
 
         # orient yourself
-        active_cell = self.labels.selected_label
+        active_cell = self.T2_box.value()
+        viewer_cell = self.labels.selected_label
         frame = self.viewer.dims.current_step[0]
 
         cell_list = (
@@ -558,7 +560,7 @@ class ModificationWidget(QWidget):
                 self.session.commit()
 
         # cell modification
-        elif len(cell_list) == 1:
+        elif len(cell_list) == 1 and viewer_cell != 0:
             cell = cell_list[0]
 
             # prepare tags
@@ -578,6 +580,40 @@ class ModificationWidget(QWidget):
             self.session.delete(cell)
             self.session.add(new_cell)
             self.session.commit()
+
+        # removal of a cell
+        elif len(cell_list) == 1 and viewer_cell == 0:
+            cell = cell_list[0]
+            self.session.delete(cell)
+            self.session.commit()
+
+            # modify trackDB if needed
+            track = (
+                self.session.query(TrackDB)
+                .filter(TrackDB.track_id == active_cell)
+                .first()
+            )
+
+            if track is not None:
+                if track.t_begin == frame:
+                    t_min = (
+                        self.session.query(CellDB.t)
+                        .filter(CellDB.track_id == active_cell)
+                        .order_by(CellDB.t)
+                        .first()
+                    )[0]
+                    track.t_begin = t_min
+
+                    self.session.commit()
+                if track.t_end == frame:
+                    t_max = (
+                        self.session.query(CellDB.t)
+                        .filter(CellDB.track_id == active_cell)
+                        .order_by(desc(CellDB.t))
+                        .first()
+                    )[0]
+                    track.t_end = t_max
+                    self.session.commit()
 
         else:
             self.viewer.status = (
