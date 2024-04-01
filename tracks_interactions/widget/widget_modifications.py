@@ -1,3 +1,4 @@
+import numpy as np
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
@@ -8,9 +9,9 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from skimage.measure import regionprops
 
 import tracks_interactions.db.db_functions as fdb
-from tracks_interactions.widget.track_operations import modify_labels
 
 
 class ModificationWidget(QWidget):
@@ -44,9 +45,9 @@ class ModificationWidget(QWidget):
             'Shift-Enter', self.mod_cell_function, overwrite=True
         )
 
-    #########################################################
+    ################################################################################################
     # track modification
-    #########################################################
+    ################################################################################################
 
     def add_track_modification_control(self):
         """
@@ -120,10 +121,14 @@ class ModificationWidget(QWidget):
         """
         Change the values of T1 and T2 spinboxes.
         """
-        if self.labels.selected_label != 0:
+        if self.labels.selected_label > 0:
             prev_tr = self.T2_box.value()
             self.T2_box.setValue(self.labels.selected_label)
             self.T1_box.setValue(prev_tr)
+
+            self.labels.metadata['persistent_label'] = (
+                self.labels.selected_label
+            )
 
     def T2_change_function(self):
         """
@@ -184,16 +189,13 @@ class ModificationWidget(QWidget):
 
         # if cutting in the middle of a track
         elif new_track:
-            track_bbox = fdb.modify_track_cellsDB(
+            fdb.cellsDB_after_trackDB(
                 self.session,
                 active_label,
                 current_frame,
                 new_track,
                 direction='after',
             )
-
-            # modify labels
-            modify_labels(self.viewer, track_bbox, active_label, new_track)
 
             # trigger family tree update
             self.viewer.layers['Labels'].selected_label = new_track
@@ -238,8 +240,6 @@ class ModificationWidget(QWidget):
         # get my label
         active_label = int(self.labels.selected_label)
 
-        # get yourself
-
         ############################################################################################
         # perform database operations
 
@@ -247,16 +247,13 @@ class ModificationWidget(QWidget):
         status = fdb.delete_trackDB(self.session, active_label)
 
         if status != 'Track not found':
-            track_bbox = fdb.modify_track_cellsDB(
+            fdb.cellsDB_after_trackDB(
                 self.session,
                 active_label,
                 current_frame=None,
                 new_track=None,
                 direction='all',
             )
-
-            # modify labels
-            modify_labels(self.viewer, track_bbox, active_label, 0)
 
             # trigger family tree update
             self.labels.selected_label = 0
@@ -317,20 +314,14 @@ class ModificationWidget(QWidget):
 
         if t1_after is not None:
             # modify cellsDB of t1
-            track_bbox_t1 = fdb.modify_track_cellsDB(
+            fdb.cellsDB_after_trackDB(
                 self.session, t1, curr_fr, t1_after, direction='after'
             )
 
-            # modify labels of t1
-            modify_labels(self.viewer, track_bbox_t1, t1, t1_after)
-
         # modify cellsDB of t2
-        track_bbox_t2 = fdb.modify_track_cellsDB(
+        fdb.cellsDB_after_trackDB(
             self.session, t2, curr_fr, t1, direction='after'
         )
-
-        # modify labels of t2
-        modify_labels(self.viewer, track_bbox_t2, t2, t1)
 
         ################################################################################################
         # change viewer status
@@ -401,24 +392,18 @@ class ModificationWidget(QWidget):
 
         if t1_after is not None:
             # modify cellsDB of t1_after
-            track_bbox_t1 = fdb.modify_track_cellsDB(
+            fdb.cellsDB_after_trackDB(
                 self.session, t1, curr_fr, t1_after, direction='after'
             )
-
-            # modify labels of t1_after
-            modify_labels(self.viewer, track_bbox_t1, t1, t1_after)
 
             # change viewer status
             self.viewer.status = f'Track {t2} has been connected to {t1}. Track {t1_after} has been created.'
 
         if t2_before is not None:
             # modify cellsDB of t2
-            track_bbox_t2 = fdb.modify_track_cellsDB(
+            fdb.cellsDB_after_trackDB(
                 self.session, t2, curr_fr, t2_before, direction='before'
             )
-
-            # modify labels of t2_before
-            modify_labels(self.viewer, track_bbox_t2, t2, t2_before)
 
             # change viewer status
             self.viewer.status = f'Track {t2} has been connected to {t1}. Track {t2_before} has been created.'
@@ -492,80 +477,85 @@ class ModificationWidget(QWidget):
         Fov modifications into a database.
         """
 
-        # # self.viewer = napari_viewer
-        # # self.labels = self.viewer.layers["Labels"]
-        # # self.session = sql_session
-        # # self.ch_list = ch_list
-        # # self.ch_names = ch_names
-        # # self.ring_width = ring_width
+        current_frame = self.viewer.dims.current_step[0]
 
-        # # orient yourself
-        # current_frame = self.viewer.dims.current_step[0]
+        refresh_status = False
 
-        # refresh_status = False
+        # get query
+        query = self.labels.metadata['query']
+        query_ids = [cell.track_id for cell in query]
 
-        # # query
-        # query_ids = [cell.track_id for cell in query]
+        # get properties of objects in the fov
+        regionprops_results = regionprops(self.labels.data)
 
-        # regionprops_results = regionprops(self.labels.data)
+        for cell_label in regionprops_results:
 
-        # for cell_label in regionprops_results:
+            cell_label_id = cell_label.label
 
-        #     cell_label_id = cell_label.label
+            if cell_label_id in query_ids:
 
-        #     if cell_label_id in query_ids:
+                # remove from the query list
+                query_ids.remove(cell_label_id)
 
-        #         # remove from the list
-        #         query_ids.remove(cell_label_id)
+                # get the cell
+                cell_query = next(
+                    x for x in query if x.track_id == cell_label_id
+                )
 
-        #         # get the cell
-        #         cell_query = [x for x in query if x.track_id == cell_label_id][0]
+                # if modified
+                row_diff = abs(cell_label.centroid[1] - cell_query.col) > 2
+                col_diff = abs(cell_label.centroid[0] - cell_query.row) > 2
+                mask_diff = not np.array_equal(
+                    cell_label.image, cell_query.mask
+                )
+                if row_diff or col_diff or mask_diff:
 
-        #         # if modified
-        #         row_diff = abs(cell_label.centroid[1] - cell_query.col) > 2
-        #         col_diff = abs(cell_label.centroid[0] - cell_query.row) > 2
-        #         mask_diff = not np.array_equal(cell_label.image, cell_query.mask)
-        #         if (row_diff or col_diff or mask_diff):
+                    # update the database
+                    self.viewer.status = f'{cell_label_id} has been modified'
 
-        #             # update the database
-        #             print(f'{cell_label_id} has been modified')
+                    # remove old from the database
+                    fdb.remove_CellDB(
+                        self.session, cell_label_id, current_frame
+                    )
 
-        #             # remove old from the database
-        #             remove_CellDB(session, cell_label_id, current_frame)
+                    # add new to the database
+                    fdb.add_new_CellDB(
+                        self.session,
+                        current_frame,
+                        cell_label,
+                        ch_list=self.ch_list,
+                    )
 
-        #             # add new to the database
-        #             add_new_CellDB(session, current_frame, cell_label, ch_list = ch_list)
+                    refresh_status = True
 
-        #             refresh_status = True
+            else:
 
-        #                 else:
+                # a new cell
+                self.viewer.status = f'{cell_label_id} has been added'
+                # add new to the database
+                fdb.add_new_CellDB(
+                    self.session,
+                    current_frame,
+                    cell_label,
+                    ch_list=self.ch_list,
+                )
 
-        #                     # a new cell
-        #                     print(f'{cell_label_id} has been added')
-        #                     # add new to the database
-        #                     add_new_CellDB(session, current_frame, cell_label, ch_list = ch_list)
+                refresh_status = True
 
-        #                     refresh_status = True
+        # for cells in query that are no longer in the field
+        for cell_id in query_ids:
 
-        #             # for cells in query that are no longer in the field
-        #             for cell_id in query_ids:
+            # cell is missing
+            self.viewer.status = f'{cell_id} has been removed'
+            # remove old from the database
+            fdb.remove_CellDB(self.session, cell_id, current_frame)
 
-        #                 # cell is missing
-        #                 print(f'{cell_id} has been removed')
-        #                 # remove old from the database
-        #                 remove_CellDB(session, cell_id, current_frame)
+            refresh_status = True
 
-        #                 refresh_status = True
+        # if any changes were made
+        if refresh_status:
 
-        #             print(len(query_ids))
-
-        #             if refresh_status:
-
-        #                 print('building frame')
-        #                 # refresh labels layer
-        #                 build_frame()
-
-        # # force graph update
-        # # because this widget doesn't know about the graph and it cannot update is directly
-        # self.viewer.layers["Labels"].selected_label = 0
-        # self.viewer.layers["Labels"].selected_label = active_cell
+            # round trip to refresh the query and the viewer
+            sel_label = self.labels.selected_label
+            self.labels.selected_label = -1
+            self.labels.selected_label = sel_label

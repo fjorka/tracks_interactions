@@ -2,7 +2,6 @@ from copy import deepcopy
 
 import dask.array as da
 import numpy as np
-import tensorstore as ts
 from skimage.transform import resize
 from sqlalchemy import and_
 from sqlalchemy.orm import aliased
@@ -328,30 +327,7 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
     return t1_after, t2_before
 
 
-def _get_track_bbox(query):
-    """
-    Helper function that returns bounding box of a track.
-    It's called by cut_cellsDB function when this database is modified.
-
-    input:
-        query - list of row objects
-    output:
-        row_start, row_stop, column_start, column_stop- bounding box
-        t_stop - last time point of the track
-    """
-
-    # find bounding boxes of the track
-    row_start = min(cell.bbox_0 for cell in query)
-    row_stop = max(cell.bbox_2 for cell in query)
-    column_start = min(cell.bbox_1 for cell in query)
-    column_stop = max(cell.bbox_3 for cell in query)
-    t_start = min(cell.t for cell in query)
-    t_stop = max(cell.t for cell in query)
-
-    return (t_start, t_stop, row_start, row_stop, column_start, column_stop)
-
-
-def modify_track_cellsDB(
+def cellsDB_after_trackDB(
     session, active_label, current_frame, new_track, direction='after'
 ):
     """
@@ -360,8 +336,6 @@ def modify_track_cellsDB(
         session
         active_label - label for which the track is cut
         current_frame - current time point
-    output:
-        track_bbox - bounding box of the track
     """
 
     # query CellDB
@@ -395,9 +369,6 @@ def modify_track_cellsDB(
 
     assert len(query) > 0, 'No cells found for the given track'
 
-    # get the track_bbox
-    track_bbox = _get_track_bbox(query)
-
     # change track_ids
     if new_track is not None:
         for cell in query:
@@ -409,52 +380,108 @@ def modify_track_cellsDB(
 
     session.commit()
 
-    return track_bbox
 
-
-def add_CellDB_to_DB(viewer):
+def trackDB_after_cellDB(session, cell_id):
     """
-    Function to add a cell to the database.
+    Function to deal with tracks upon cell removal/adding
+    cell_id - id of the removed cell
+    current_frame
     """
 
-    current_label = viewer.layers['Labels'].selected_label
-    frame = viewer.dims.current_step[0]
+    track = session.query(TrackDB).filter(TrackDB.track_id == cell_id).first()
 
-    corner_pixels = viewer.layers['Labels'].corner_pixels
+    if track is not None:
 
-    sc_r_start = corner_pixels[0, 1]
-    sc_r_stop = corner_pixels[1, 1]
-    sc_c_start = corner_pixels[0, 2]
-    sc_c_stop = corner_pixels[1, 2]
+        cells_t = (
+            session.query(CellDB.t).filter(CellDB.track_id == cell_id).all()
+        )
+        cells_t = [cell[0] for cell in cells_t]
 
-    visible_labels = viewer.layers['Labels'].data[
-        frame, sc_r_start:sc_r_stop, sc_c_start:sc_c_stop
-    ]
+        t_min = min(cells_t)
+        t_max = max(cells_t)
 
-    if type(viewer.layers['Labels'].data) == ts.TensorStore:
-        visible_labels = visible_labels.read().result()
+        track.t_begin = t_min
+        track.t_end = t_max
+
+        session.commit()
+
+
+def remove_CellDB(session, cell_id, current_frame):
+    """
+    Function to remove a cell from the database.
+    """
+
+    cell = (
+        session.query(CellDB)
+        .filter(CellDB.track_id == cell_id)
+        .filter(CellDB.t == current_frame)
+        .first()
+    )
+
+    session.delete(cell)
+    session.commit()
+
+    # deal with the tracks
+    trackDB_after_cellDB(session, cell_id)
+
+
+def add_new_core_CellDB(session, current_frame, cell):
+    """
+    session
+    current_frame
+    cell - regionprops format cell
+    """
 
     # start the object
-    cell = CellDB(id=current_label, t=frame, track_id=current_label)
+    cell_db = CellDB(id=cell.label, t=current_frame, track_id=cell.label)
 
-    # get properties
-    coords = np.argwhere(visible_labels == current_label)
-    rmin, cmin = coords.min(axis=0)
-    rmax, cmax = coords.max(axis=0)
+    cell_db.row = int(cell.centroid[0])
+    cell_db.col = int(cell.centroid[1])
 
-    coords_mean = coords.mean(axis=0)
-    cell.row = int(coords_mean[0] + sc_r_start)
-    cell.col = int(coords_mean[1] + sc_c_start)
+    cell_db.bbox_0 = int(cell.bbox[0])
+    cell_db.bbox_1 = int(cell.bbox[1])
+    cell_db.bbox_2 = int(cell.bbox[2])
+    cell_db.bbox_3 = int(cell.bbox[3])
 
-    cell.bbox_0 = int(rmin + sc_r_start)
-    cell.bbox_1 = int(cmin + sc_c_start)
-    cell.bbox_2 = int(rmax + sc_r_start + 1)
-    cell.bbox_3 = int(cmax + sc_c_start + 1)
+    cell_db.mask = cell.image
 
-    roi = visible_labels[rmin : rmax + 1, cmin : cmax + 1]
-    cell.mask = roi == current_label
+    session.add(cell_db)
+    session.commit()
 
-    return cell
+    return cell_db
+
+
+def add_new_CellDB(
+    session,
+    current_frame,
+    cell,
+    modified=True,
+    ch_list=None,
+    ch_names=None,
+    ring_width=5,
+):
+    """
+    Function to add a complete cell
+    """
+
+    cell_db = add_new_core_CellDB(session, current_frame, cell)
+
+    # add signals to the cell
+    new_signals = calculate_cell_signals(
+        cell_db, ch_list=ch_list, ch_names=ch_names, ring_width=ring_width
+    )
+    cell_db.signals = new_signals
+
+    # add modified tag to the cell
+    tags = {}
+    if modified:
+        tags['modified'] = True
+        cell_db.tags = tags
+
+    session.commit()
+
+    # deal with the tracks
+    trackDB_after_cellDB(session, cell_db.track_id)
 
 
 def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):

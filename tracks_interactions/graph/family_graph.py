@@ -134,12 +134,15 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             self.plot_view.removeItem(item)
 
         # get an active label
-        active_label = int(self.labels.selected_label)
+        if self.viewer.layers['Labels'].selected_label > 0:
+            self.active_label = int(self.labels.selected_label)
+        else:
+            self.active_label = int(self.labels.metadata['persistent_label'])
 
         # check if the label is in the database
         query = (
             self.session.query(TrackDB)
-            .filter(TrackDB.track_id == active_label)
+            .filter(TrackDB.track_id == self.active_label)
             .first()
         )
 
@@ -166,7 +169,6 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         """
 
         y_max = 1
-        active_label = int(self.labels.selected_label)
 
         # render the tree
         t_rendering = t.render('.')
@@ -191,7 +193,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
                 label_color = self.labels.get_color(node_name)
 
-                if n.name == active_label:
+                if n.name == self.active_label:
                     pen_color = mkColor((label_color * 255).astype(int))
                     pen = mkPen(color=pen_color, width=4)
                 else:

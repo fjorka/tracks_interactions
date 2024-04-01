@@ -119,6 +119,9 @@ class TrackNavigationWidget(QWidget):
                 self.viewer.layers['Labels'].data = frame
                 self.viewer.status = f'Found {len(query)} cells in the field.'
 
+                # store the query with the layer
+                self.labels.metadata['query'] = query
+
             else:
                 self.viewer.layers['Labels'].refresh()
                 self.viewer.status = f'More than {self.query_lim} in the field - zoom in to display labels.'
@@ -185,12 +188,23 @@ class TrackNavigationWidget(QWidget):
                 r = cell.row
                 c = cell.col
 
-                # move the camera
-                self.viewer.camera.center = (0, r, c)
+                # check if there is movement
+                _, x, y = self.viewer.camera.center
+
+                if x == r and y == c:
+                    # trigger rebuilding of labels
+                    self.build_labels()
+                else:
+                    # move the camera
+                    self.viewer.camera.center = (0, r, c)
 
             else:
                 self.viewer.status = 'No object in this frame.'
                 self.build_labels()
+
+        else:
+            self.viewer.status = 'No object selected.'
+            self.build_labels()
 
     def center_object_function(self):
         """
