@@ -1,5 +1,3 @@
-from typing import Dict, List, Tuple
-
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -10,9 +8,9 @@ from tracks_interactions.db.db_model import NO_PARENT
 
 @njit
 def _fast_forest_transverse(
-    roots: List[int],
-    forest: Dict[int, List[int]],
-) -> Tuple[List[List[int]], List[int], List[int], List[int], List[int]]:
+    roots: list[int],
+    forest: dict[int, list[int]],
+) -> tuple[list[list[int]], list[int], list[int], list[int], list[int]]:
     """Transverse the tracks forest graph creating a distinc id to each path.
 
     Parameters
@@ -67,13 +65,13 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     assert df.shape[0] > 0
 
     df.index = df.index.astype(int)
-    df["parent_id"] = df["parent_id"].astype(int)
+    df['parent_id'] = df['parent_id'].astype(int)
 
-    forest = _create_tracks_forest(df.index.values, df["parent_id"].values)
+    forest = _create_tracks_forest(df.index.values, df['parent_id'].values)
     roots = forest.pop(NO_PARENT)
 
-    df["track_id"] = NO_PARENT
-    df["parent_track_id"] = NO_PARENT
+    df['track_id'] = NO_PARENT
+    df['parent_track_id'] = NO_PARENT
 
     (
         paths,
@@ -84,15 +82,15 @@ def add_track_ids_to_tracks_df(df: pd.DataFrame) -> pd.DataFrame:
     ) = _fast_forest_transverse(roots, forest)
 
     paths = np.concatenate(paths)
-    df.loc[paths, "track_id"] = np.repeat(track_ids, lengths)
-    df.loc[paths, "parent_track_id"] = np.repeat(parent_track_ids, lengths)
-    df.loc[paths, "root"] = df.loc[
-        np.repeat(roots_list, lengths), "track_id"
+    df.loc[paths, 'track_id'] = np.repeat(track_ids, lengths)
+    df.loc[paths, 'parent_track_id'] = np.repeat(parent_track_ids, lengths)
+    df.loc[paths, 'root'] = df.loc[
+        np.repeat(roots_list, lengths), 'track_id'
     ].tolist()
 
-    unlabeled_tracks = df["track_id"] == NO_PARENT
+    unlabeled_tracks = df['track_id'] == NO_PARENT
     assert not np.any(
         unlabeled_tracks
-    ), f"Something went wrong. Found unlabeled tracks\n{df[unlabeled_tracks]}"
+    ), f'Something went wrong. Found unlabeled tracks\n{df[unlabeled_tracks]}'
 
     return df

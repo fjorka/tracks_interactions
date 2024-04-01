@@ -13,16 +13,16 @@ from tracks_interactions.db.db_functions import (
 from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def db_session():
     # see "./tests/fixtures/test_database_content.PNG" for a visual representation of copied part of the test database
-    test_db_path = r"./tests/fixtures/db_2tables_test.db"
-    original_engine = create_engine(f"sqlite:///{test_db_path}")
+    test_db_path = r'./tests/fixtures/db_2tables_test.db'
+    original_engine = create_engine(f'sqlite:///{test_db_path}')
     original_metadata = MetaData()
     original_metadata.reflect(bind=original_engine)
 
     # Create an in-memory SQLite database
-    memory_engine = create_engine("sqlite:///:memory:")
+    memory_engine = create_engine('sqlite:///:memory:')
     original_metadata.create_all(memory_engine)
 
     # Open sessions
@@ -115,7 +115,7 @@ def test_remove_track(db_session):
     """Test - remove a track"""
     to_del = 1
     status = delete_trackDB(db_session, to_del)
-    assert status == f"Track {to_del} has been deleted."
+    assert status == f'Track {to_del} has been deleted.'
 
     # Verify the record was removed
     assert not db_session.query(TrackDB).filter_by(track_id=to_del).all()
@@ -140,7 +140,7 @@ def test_remove_none_track(db_session):
     to_del = 6
     init_len = db_session.query(TrackDB).all()
     status = delete_trackDB(db_session, to_del)
-    assert status == "Track not found"
+    assert status == 'Track not found'
     assert len(db_session.query(TrackDB).all()) == len(init_len)
 
 
@@ -269,7 +269,7 @@ def test_cut_trackDB_beyond_track(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -283,7 +283,7 @@ def test_cut_trackDB_beyond_track(db_session):
     # assert that t1 new and t1 are the same
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             assert getattr(t1_new, key) == getattr(t1, key)
 
@@ -363,7 +363,7 @@ def test_cut_merge_trackDB(db_session):
     # re-merge new to old
     t1_ind = 1
     t2_ind = new_track
-    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
     # assert that the new track is in the database
     assert (
@@ -423,7 +423,7 @@ def test_modify_track_cellsDB_after(db_session):
     new_track = 100
 
     _ = modify_track_cellsDB(
-        db_session, active_label, current_frame, new_track, direction="after"
+        db_session, active_label, current_frame, new_track, direction='after'
     )
 
     # assert that there are only 5 objects of old track in the cell table after cut
@@ -452,7 +452,7 @@ def test_modify_track_cellsDB_before(db_session):
     new_track = 100
 
     _ = modify_track_cellsDB(
-        db_session, active_label, current_frame, new_track, direction="before"
+        db_session, active_label, current_frame, new_track, direction='before'
     )
 
     # assert that there are only n objects of old track in the cell table after cut
@@ -487,7 +487,7 @@ def test_freely_floating_merge(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -497,14 +497,14 @@ def test_freely_floating_merge(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
     # Detach the copy from the session
     make_transient(t2)
 
-    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
     # assert that the merger from track is not in the database
     assert len(db_session.query(TrackDB).filter_by(track_id=t2_ind).all()) == 0
@@ -534,7 +534,7 @@ def test_double_cut_merge(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -544,14 +544,14 @@ def test_double_cut_merge(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
     # Detach the copy from the session
     make_transient(t2)
 
-    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
     # assert that the merger from track is not in the database
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -598,7 +598,7 @@ def test_after_t1_end_track_merge(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -616,14 +616,14 @@ def test_after_t1_end_track_merge(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
     # Detach the copy from the session
     make_transient(t2)
 
-    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
     # assert single objects of t1 and t2
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -676,7 +676,7 @@ def test_before_t2_start_track_merge(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -694,14 +694,14 @@ def test_before_t2_start_track_merge(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
     # Detach the copy from the session
     make_transient(t2)
 
-    _ = integrate_trackDB(db_session, "merge", t1_ind, t2_ind, current_frame)
+    _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
     # assert single objects of t1 and t2
     assert db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
@@ -751,7 +751,7 @@ def test_freely_floating_connect(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -761,7 +761,7 @@ def test_freely_floating_connect(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
@@ -769,7 +769,7 @@ def test_freely_floating_connect(db_session):
     make_transient(t2)
 
     t1_after, t2_before = integrate_trackDB(
-        db_session, "connect", t1_ind, t2_ind, current_frame
+        db_session, 'connect', t1_ind, t2_ind, current_frame
     )
 
     # assert that the merger to has expected properties
@@ -809,7 +809,7 @@ def test_double_cut_connect(db_session):
     t1 = TrackDB()
     for key in t1_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t1, key, getattr(t1_org, key))
 
@@ -819,7 +819,7 @@ def test_double_cut_connect(db_session):
     t2 = TrackDB()
     for key in t2_org.__dict__:
         if (
-            key != "_sa_instance_state"
+            key != '_sa_instance_state'
         ):  # Exclude the SQLAlchemy instance state
             setattr(t2, key, getattr(t2_org, key))
 
@@ -827,7 +827,7 @@ def test_double_cut_connect(db_session):
     make_transient(t2)
 
     t1_after, t2_before = integrate_trackDB(
-        db_session, "connect", t1_ind, t2_ind, current_frame
+        db_session, 'connect', t1_ind, t2_ind, current_frame
     )
 
     assert expected_t1_after == t1_after

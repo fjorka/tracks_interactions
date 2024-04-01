@@ -8,10 +8,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy import desc
 
 import tracks_interactions.db.db_functions as fdb
-from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
 from tracks_interactions.widget.track_operations import modify_labels
 
 
@@ -28,7 +26,7 @@ class ModificationWidget(QWidget):
         self.setLayout(QVBoxLayout())
 
         self.viewer = napari_viewer
-        self.labels = self.viewer.layers["Labels"]
+        self.labels = self.viewer.layers['Labels']
         self.session = sql_session
         self.ch_list = ch_list
         self.ch_names = ch_names
@@ -43,7 +41,7 @@ class ModificationWidget(QWidget):
 
         # add a keyboard shortcut for label modification
         self.viewer.bind_key(
-            "Shift-Enter", self.mod_cell_function, overwrite=True
+            'Shift-Enter', self.mod_cell_function, overwrite=True
         )
 
     #########################################################
@@ -61,13 +59,13 @@ class ModificationWidget(QWidget):
         modification_row.setLayout(QGridLayout())
 
         # Create the first row widgets
-        labelT2 = QLabel("active")
+        labelT2 = QLabel('active')
         self.T2_box = self.add_T_spinbox(self.labels.selected_label)
         arrowLabel = QLabel(
-            "→", alignment=Qt.AlignCenter
+            '→', alignment=Qt.AlignCenter
         )  # Big arrow label, centered
-        arrowLabel.setStyleSheet("font-size: 24px;")  # Making the arrow bigger
-        labelT1 = QLabel("upstream")
+        arrowLabel.setStyleSheet('font-size: 24px;')  # Making the arrow bigger
+        labelT1 = QLabel('upstream')
         self.T1_box = self.add_T_spinbox(self.labels.selected_label)
 
         # connect spinboxed to the event of changing the track
@@ -139,12 +137,12 @@ class ModificationWidget(QWidget):
         """
         Add a button to cut tracks.
         """
-        cut_track_btn = QPushButton("Cut track")
+        cut_track_btn = QPushButton('Cut track')
 
         cut_track_btn.clicked.connect(self.cut_track_function)
 
         path_to_cut_icon = (
-            r"../tracks_interactions/icons/icons8-scissors-50.png"
+            r'../tracks_interactions/icons/icons8-scissors-50.png'
         )
 
         icon = QIcon(path_to_cut_icon)
@@ -152,7 +150,7 @@ class ModificationWidget(QWidget):
         cut_track_btn.setText(None)
 
         # Set the tooltip for the merge track button
-        cut_track_btn.setToolTip("Cut the active track at the current frame.")
+        cut_track_btn.setToolTip('Cut the active track at the current frame.')
 
         return cut_track_btn
 
@@ -191,14 +189,14 @@ class ModificationWidget(QWidget):
                 active_label,
                 current_frame,
                 new_track,
-                direction="after",
+                direction='after',
             )
 
             # modify labels
             modify_labels(self.viewer, track_bbox, active_label, new_track)
 
             # trigger family tree update
-            self.viewer.layers["Labels"].selected_label = new_track
+            self.viewer.layers['Labels'].selected_label = new_track
 
         # if clicked by mistake
         else:
@@ -206,7 +204,7 @@ class ModificationWidget(QWidget):
 
         ############################################################################################
         # change viewer status
-        self.viewer.status = f"Track {active_label} has been cut."
+        self.viewer.status = f'Track {active_label} has been cut.'
 
     ################################################################################################
     ################################################################################################
@@ -214,18 +212,18 @@ class ModificationWidget(QWidget):
         """
         Add a button to cut tracks.
         """
-        del_track_btn = QPushButton("Delete track")
+        del_track_btn = QPushButton('Delete track')
 
         del_track_btn.clicked.connect(self.del_track_function)
 
-        path_to_del_icon = r"../tracks_interactions/icons/icons8-delete-48.png"
+        path_to_del_icon = r'../tracks_interactions/icons/icons8-delete-48.png'
 
         icon = QIcon(path_to_del_icon)
         del_track_btn.setIcon(icon)
         del_track_btn.setText(None)
 
         # Set the tooltip for the del track button
-        del_track_btn.setToolTip("Delete the active track.")
+        del_track_btn.setToolTip('Delete the active track.')
 
         return del_track_btn
 
@@ -248,13 +246,13 @@ class ModificationWidget(QWidget):
         # delete trackDB
         status = fdb.delete_trackDB(self.session, active_label)
 
-        if status != "Track not found":
+        if status != 'Track not found':
             track_bbox = fdb.modify_track_cellsDB(
                 self.session,
                 active_label,
                 current_frame=None,
                 new_track=None,
-                direction="all",
+                direction='all',
             )
 
             # modify labels
@@ -271,11 +269,11 @@ class ModificationWidget(QWidget):
         """
         Add a button to merge two tracks.
         """
-        merge_track_btn = QPushButton("M")
+        merge_track_btn = QPushButton('M')
 
         merge_track_btn.clicked.connect(self.merge_track_function)
 
-        path_to_merge_icon = r"../tracks_interactions/icons/icons8-link-50.png"
+        path_to_merge_icon = r'../tracks_interactions/icons/icons8-link-50.png'
 
         icon = QIcon(path_to_merge_icon)
         merge_track_btn.setIcon(icon)
@@ -300,7 +298,7 @@ class ModificationWidget(QWidget):
         ################################################################################################
         # check if the request is possible
         if t1 == t2:
-            self.viewer.status = "Error - cannot merge a track with itself."
+            self.viewer.status = 'Error - cannot merge a track with itself.'
             return
 
         ################################################################################################
@@ -308,7 +306,7 @@ class ModificationWidget(QWidget):
 
         # cut trackDB
         t1_after, _ = fdb.integrate_trackDB(
-            self.session, "merge", t1, t2, curr_fr
+            self.session, 'merge', t1, t2, curr_fr
         )
 
         if t1_after == -1:
@@ -320,7 +318,7 @@ class ModificationWidget(QWidget):
         if t1_after is not None:
             # modify cellsDB of t1
             track_bbox_t1 = fdb.modify_track_cellsDB(
-                self.session, t1, curr_fr, t1_after, direction="after"
+                self.session, t1, curr_fr, t1_after, direction='after'
             )
 
             # modify labels of t1
@@ -328,7 +326,7 @@ class ModificationWidget(QWidget):
 
         # modify cellsDB of t2
         track_bbox_t2 = fdb.modify_track_cellsDB(
-            self.session, t2, curr_fr, t1, direction="after"
+            self.session, t2, curr_fr, t1, direction='after'
         )
 
         # modify labels of t2
@@ -338,7 +336,7 @@ class ModificationWidget(QWidget):
         # change viewer status
         self.T2_box.setValue(t1)
         self.T1_box.setValue(t2)
-        self.viewer.status = f"Track {t2} has been merged to {t1}. Track {t1_after} has been created."
+        self.viewer.status = f'Track {t2} has been merged to {t1}. Track {t1_after} has been created.'
 
         # trigger updates
         self.labels.selected_label = t1
@@ -349,12 +347,12 @@ class ModificationWidget(QWidget):
         """
         Add a button to connect two tracks.
         """
-        connect_track_btn = QPushButton("C")
+        connect_track_btn = QPushButton('C')
 
         connect_track_btn.clicked.connect(self.connect_track_function)
 
         path_to_con_icon = (
-            r"../tracks_interactions/icons/icons8-connect-50.png"
+            r'../tracks_interactions/icons/icons8-connect-50.png'
         )
 
         icon = QIcon(path_to_con_icon)
@@ -384,7 +382,7 @@ class ModificationWidget(QWidget):
         ################################################################################################
         # check if the request is possible
         if t1 == t2:
-            self.viewer.status = "Error - cannot connect a track with itself."
+            self.viewer.status = 'Error - cannot connect a track with itself.'
             return
 
         ################################################################################################
@@ -392,7 +390,7 @@ class ModificationWidget(QWidget):
 
         # cut trackDB
         t1_after, t2_before = fdb.integrate_trackDB(
-            self.session, "connect", t1, t2, curr_fr
+            self.session, 'connect', t1, t2, curr_fr
         )
 
         if t1_after == -1:
@@ -404,33 +402,33 @@ class ModificationWidget(QWidget):
         if t1_after is not None:
             # modify cellsDB of t1_after
             track_bbox_t1 = fdb.modify_track_cellsDB(
-                self.session, t1, curr_fr, t1_after, direction="after"
+                self.session, t1, curr_fr, t1_after, direction='after'
             )
 
             # modify labels of t1_after
             modify_labels(self.viewer, track_bbox_t1, t1, t1_after)
 
             # change viewer status
-            self.viewer.status = f"Track {t2} has been connected to {t1}. Track {t1_after} has been created."
+            self.viewer.status = f'Track {t2} has been connected to {t1}. Track {t1_after} has been created.'
 
         if t2_before is not None:
             # modify cellsDB of t2
             track_bbox_t2 = fdb.modify_track_cellsDB(
-                self.session, t2, curr_fr, t2_before, direction="before"
+                self.session, t2, curr_fr, t2_before, direction='before'
             )
 
             # modify labels of t2_before
             modify_labels(self.viewer, track_bbox_t2, t2, t2_before)
 
             # change viewer status
-            self.viewer.status = f"Track {t2} has been connected to {t1}. Track {t2_before} has been created."
+            self.viewer.status = f'Track {t2} has been connected to {t1}. Track {t2_before} has been created.'
 
         # account for different both and none new tracks in viewer status
         if t1_after is not None and t2_before is not None:
-            self.viewer.status = f"Track {t2} has been connected to {t1}. Tracks {t1_after} and {t2_before} have been created."
+            self.viewer.status = f'Track {t2} has been connected to {t1}. Tracks {t1_after} and {t2_before} have been created.'
 
         elif t1_after is None or t2_before is None:
-            self.viewer.status = f"Track {t2} has been connected to {t1}."
+            self.viewer.status = f'Track {t2} has been connected to {t1}.'
 
         # trigger family tree update
         self.labels.selected_label = 0
@@ -446,18 +444,18 @@ class ModificationWidget(QWidget):
         """
         Add a button to connect two tracks.
         """
-        new_track_btn = QPushButton("N")
+        new_track_btn = QPushButton('N')
 
         new_track_btn.clicked.connect(self.new_track_function)
 
-        path_to_new_icon = r"../tracks_interactions/icons/icons8-add-64.png"
+        path_to_new_icon = r'../tracks_interactions/icons/icons8-add-64.png'
 
         icon = QIcon(path_to_new_icon)
         new_track_btn.setIcon(icon)
         new_track_btn.setText(None)
 
         # Set the tooltip for the button
-        new_track_btn.setToolTip("Get a new unique track number.")
+        new_track_btn.setToolTip('Get a new unique track number.')
 
         return new_track_btn
 
@@ -470,7 +468,7 @@ class ModificationWidget(QWidget):
         new_track = fdb.newTrack_number(self.session)
         self.labels.selected_label = new_track
 
-        self.viewer.status = f"You can start track {new_track}."
+        self.viewer.status = f'You can start track {new_track}.'
 
     ################################################################################################
     ################################################################################################
@@ -478,151 +476,96 @@ class ModificationWidget(QWidget):
         """
         Add a button to trigger storing cell in the database.
         """
-        mod_cell_btn = QPushButton("Save Cell (Add/Modify/Delete)")
+        mod_cell_btn = QPushButton('Save Cell (Add/Modify/Delete)')
 
         mod_cell_btn.clicked.connect(self.mod_cell_function)
 
         # Set the tooltip for the button
         mod_cell_btn.setToolTip(
-            "Saves the active label. Shortcut: Shift + Enter."
+            'Saves the active label. Shortcut: Shift + Enter.'
         )
 
         return mod_cell_btn
 
     def mod_cell_function(self, viewer=None):
         """
-        Store the current cell in the database.
+        Fov modifications into a database.
         """
 
-        # orient yourself
-        active_cell = self.T2_box.value()
-        viewer_cell = self.labels.selected_label
-        frame = self.viewer.dims.current_step[0]
+        # # self.viewer = napari_viewer
+        # # self.labels = self.viewer.layers["Labels"]
+        # # self.session = sql_session
+        # # self.ch_list = ch_list
+        # # self.ch_names = ch_names
+        # # self.ring_width = ring_width
 
-        cell_list = (
-            self.session.query(CellDB)
-            .filter(CellDB.t == frame)
-            .filter(CellDB.track_id == active_cell)
-            .all()
-        )
+        # # orient yourself
+        # current_frame = self.viewer.dims.current_step[0]
 
-        # adding new cell
-        if len(cell_list) == 0:
-            #  create CellDB
-            new_cell = fdb.add_CellDB_to_DB(self.viewer)
-            new_signals = fdb.calculate_cell_signals(
-                new_cell,
-                ch_list=self.ch_list,
-                ch_names=self.ch_names,
-                ring_width=self.ring_width,
-            )
-            new_cell.signals = new_signals
-            self.session.add(new_cell)
-            self.session.commit()
+        # refresh_status = False
 
-            # introduce TrackDB changes
-            track = (
-                self.session.query(TrackDB)
-                .filter(TrackDB.track_id == active_cell)
-                .first()
-            )
-            if track is not None:
-                if track.t_begin > frame:
-                    track.t_begin = frame
-                    track.parent_track_id = NO_PARENT
-                    track.root = active_cell
-                if track.t_end < frame:
-                    track.t_end = frame
+        # # query
+        # query_ids = [cell.track_id for cell in query]
 
-                    # find children
-                    children = (
-                        self.session.query(TrackDB)
-                        .filter(TrackDB.parent_track_id == active_cell)
-                        .all()
-                    )
-                    # cut off children
-                    for child in children:
-                        _, _ = fdb.cut_trackDB(
-                            self.session, child.track_id, child.t_begin
-                        )
-                        self.session.commit()
+        # regionprops_results = regionprops(self.labels.data)
 
-                self.session.commit()
-            else:
-                new_track = TrackDB(
-                    track_id=active_cell,
-                    parent_track_id=NO_PARENT,
-                    root=active_cell,
-                    t_begin=frame,
-                    t_end=frame,
-                )
-                self.session.add(new_track)
-                self.session.commit()
+        # for cell_label in regionprops_results:
 
-        # cell modification
-        elif len(cell_list) == 1 and viewer_cell != 0:
-            cell = cell_list[0]
+        #     cell_label_id = cell_label.label
 
-            # prepare tags
-            tags = cell.tags
-            tags["modified"] = True
+        #     if cell_label_id in query_ids:
 
-            #  create CellDB
-            new_cell = fdb.add_CellDB_to_DB(self.viewer)
-            new_cell.tags = tags
+        #         # remove from the list
+        #         query_ids.remove(cell_label_id)
 
-            # add signals to the new cell
-            signals = fdb.calculate_cell_signals(
-                new_cell, ch_list=self.ch_list
-            )
-            new_cell.signals = signals
+        #         # get the cell
+        #         cell_query = [x for x in query if x.track_id == cell_label_id][0]
 
-            self.session.delete(cell)
-            self.session.add(new_cell)
-            self.session.commit()
+        #         # if modified
+        #         row_diff = abs(cell_label.centroid[1] - cell_query.col) > 2
+        #         col_diff = abs(cell_label.centroid[0] - cell_query.row) > 2
+        #         mask_diff = not np.array_equal(cell_label.image, cell_query.mask)
+        #         if (row_diff or col_diff or mask_diff):
 
-        # removal of a cell
-        elif len(cell_list) == 1 and viewer_cell == 0:
-            cell = cell_list[0]
-            self.session.delete(cell)
-            self.session.commit()
+        #             # update the database
+        #             print(f'{cell_label_id} has been modified')
 
-            # modify trackDB if needed
-            track = (
-                self.session.query(TrackDB)
-                .filter(TrackDB.track_id == active_cell)
-                .first()
-            )
+        #             # remove old from the database
+        #             remove_CellDB(session, cell_label_id, current_frame)
 
-            if track is not None:
-                if track.t_begin == frame:
-                    t_min = (
-                        self.session.query(CellDB.t)
-                        .filter(CellDB.track_id == active_cell)
-                        .order_by(CellDB.t)
-                        .first()
-                    )[0]
-                    track.t_begin = t_min
+        #             # add new to the database
+        #             add_new_CellDB(session, current_frame, cell_label, ch_list = ch_list)
 
-                    self.session.commit()
-                if track.t_end == frame:
-                    t_max = (
-                        self.session.query(CellDB.t)
-                        .filter(CellDB.track_id == active_cell)
-                        .order_by(desc(CellDB.t))
-                        .first()
-                    )[0]
-                    track.t_end = t_max
-                    self.session.commit()
+        #             refresh_status = True
 
-        else:
-            self.viewer.status = (
-                f"Error - Multiple cells found for {active_cell} at {frame}."
-            )
+        #                 else:
 
-        self.viewer.status = f"Cell {active_cell} from frame {frame} saved."
+        #                     # a new cell
+        #                     print(f'{cell_label_id} has been added')
+        #                     # add new to the database
+        #                     add_new_CellDB(session, current_frame, cell_label, ch_list = ch_list)
 
-        # force graph update
-        # because this widget doesn't know about the graph and it cannot update is directly
-        self.viewer.layers["Labels"].selected_label = 0
-        self.viewer.layers["Labels"].selected_label = active_cell
+        #                     refresh_status = True
+
+        #             # for cells in query that are no longer in the field
+        #             for cell_id in query_ids:
+
+        #                 # cell is missing
+        #                 print(f'{cell_id} has been removed')
+        #                 # remove old from the database
+        #                 remove_CellDB(session, cell_id, current_frame)
+
+        #                 refresh_status = True
+
+        #             print(len(query_ids))
+
+        #             if refresh_status:
+
+        #                 print('building frame')
+        #                 # refresh labels layer
+        #                 build_frame()
+
+        # # force graph update
+        # # because this widget doesn't know about the graph and it cannot update is directly
+        # self.viewer.layers["Labels"].selected_label = 0
+        # self.viewer.layers["Labels"].selected_label = active_cell

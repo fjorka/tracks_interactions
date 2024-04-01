@@ -21,7 +21,7 @@ class SignalGraph(GraphicsLayoutWidget):
 
         self.session = session
         self.viewer = viewer
-        self.labels = self.viewer.layers["Labels"]
+        self.labels = self.viewer.layers['Labels']
         self.legend_on = legend_on
         self.signal_list = selected_signals
         self.color_list = color_list
@@ -31,7 +31,7 @@ class SignalGraph(GraphicsLayoutWidget):
             self.tag_dictionary = tag_dictionary
 
         # initialize graph
-        self.plot_view = self.addPlot(title="", labels={"bottom": "Time"})
+        self.plot_view = self.addPlot(title='', labels={'bottom': 'Time'})
 
         self.t_max = self.viewer.dims.range[0][1]
         self.plot_view.setXRange(0, self.t_max)
@@ -90,7 +90,7 @@ class SignalGraph(GraphicsLayoutWidget):
         Get information about the cell from the database.
         """
         # get an active label
-        self.active_label = int(self.viewer.layers["Labels"].selected_label)
+        self.active_label = int(self.viewer.layers['Labels'].selected_label)
 
         # get the info
         self.query = (
@@ -130,7 +130,7 @@ class SignalGraph(GraphicsLayoutWidget):
                         item[0]
                         for item in self.query
                         if (
-                            item[2].get(tag) == "True"
+                            item[2].get(tag) == 'True'
                             or item[2].get(tag) is True
                         )
                     ]
@@ -141,10 +141,10 @@ class SignalGraph(GraphicsLayoutWidget):
                             self.plot_view.addItem(text)
                             text.setPos(x, y)
             else:
-                self.viewer.status = "No tags to display."
+                self.viewer.status = 'No tags to display.'
 
         else:
-            self.viewer.status = "Error - no such label in the database."
+            self.viewer.status = 'Error - no such label in the database.'
 
     def redraw_signals(self):
         """
@@ -193,7 +193,7 @@ class SignalGraph(GraphicsLayoutWidget):
                     if self.legend_on:
                         legend.addItem(pl, sig)
         else:
-            self.viewer.status = "Error - no such label in the database."
+            self.viewer.status = 'Error - no such label in the database.'
 
     def update_tags(self):
         """

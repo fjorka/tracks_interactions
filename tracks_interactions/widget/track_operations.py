@@ -10,7 +10,7 @@ def modify_labels(viewer: Viewer, track_bbox, active_label, new_track):
     """
 
     # modify labels
-    labels = viewer.layers["Labels"].data
+    labels = viewer.layers['Labels'].data
     labels_type = type(labels)
 
     sel = labels[
@@ -30,6 +30,6 @@ def modify_labels(viewer: Viewer, track_bbox, active_label, new_track):
     ] = sel
 
     if labels_type == ts.TensorStore:
-        viewer.layers["Labels"].refresh()
+        viewer.layers['Labels'].refresh()
     else:
-        viewer.layers["Labels"].data = labels
+        viewer.layers['Labels'].data = labels

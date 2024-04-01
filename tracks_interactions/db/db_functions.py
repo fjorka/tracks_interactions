@@ -47,7 +47,7 @@ def get_descendants(session, active_label):
         .cte(recursive=True)
     )
 
-    cte_alias = aliased(cte, name="cte_alias")
+    cte_alias = aliased(cte, name='cte_alias')
 
     cte = cte.union_all(
         session.query(TrackDB).filter(
@@ -89,10 +89,10 @@ def delete_trackDB(session, active_label):
 
         session.commit()
 
-        status = f"Track {active_label} has been deleted."
+        status = f'Track {active_label} has been deleted.'
 
     else:
-        status = "Track not found"
+        status = 'Track not found'
 
     return status
 
@@ -175,7 +175,7 @@ def cut_trackDB(session, active_label, current_frame):
         session.commit()
 
     else:
-        raise ValueError("Track situation unaccounted for")
+        raise ValueError('Track situation unaccounted for')
 
     return mitosis, new_track
 
@@ -306,7 +306,7 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
                 # this route will call descendants twice but I expect it to be rare
                 _, _ = cut_trackDB(session, track.track_id, track.t_begin)
 
-    if operation == "merge":
+    if operation == 'merge':
         # change t1_before
         # does it account for merging with gaps only?
         t1.t_end = t2.t_end
@@ -315,7 +315,7 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
         _merge_t2(session, t2, t1, current_frame)
         t2_before = None
 
-    elif operation == "connect":
+    elif operation == 'connect':
         # change t1
         t1.t_end = current_frame - 1
         t2_before = _connect_t2(session, t2, t1, current_frame)
@@ -352,7 +352,7 @@ def _get_track_bbox(query):
 
 
 def modify_track_cellsDB(
-    session, active_label, current_frame, new_track, direction="after"
+    session, active_label, current_frame, new_track, direction='after'
 ):
     """
 
@@ -366,7 +366,7 @@ def modify_track_cellsDB(
 
     # query CellDB
     # order by time
-    if direction == "after":
+    if direction == 'after':
         query = (
             session.query(CellDB)
             .filter(
@@ -377,7 +377,7 @@ def modify_track_cellsDB(
             .order_by(CellDB.t)
             .all()
         )
-    elif direction == "before":
+    elif direction == 'before':
         query = (
             session.query(CellDB)
             .filter(
@@ -386,14 +386,14 @@ def modify_track_cellsDB(
             .order_by(CellDB.t)
             .all()
         )
-    elif direction == "all":
+    elif direction == 'all':
         query = (
             session.query(CellDB).filter(CellDB.track_id == active_label).all()
         )
     else:
         raise ValueError("Direction should be 'all', 'before' or 'after'.")
 
-    assert len(query) > 0, "No cells found for the given track"
+    assert len(query) > 0, 'No cells found for the given track'
 
     # get the track_bbox
     track_bbox = _get_track_bbox(query)
@@ -417,21 +417,21 @@ def add_CellDB_to_DB(viewer):
     Function to add a cell to the database.
     """
 
-    current_label = viewer.layers["Labels"].selected_label
+    current_label = viewer.layers['Labels'].selected_label
     frame = viewer.dims.current_step[0]
 
-    corner_pixels = viewer.layers["Labels"].corner_pixels
+    corner_pixels = viewer.layers['Labels'].corner_pixels
 
     sc_r_start = corner_pixels[0, 1]
     sc_r_stop = corner_pixels[1, 1]
     sc_c_start = corner_pixels[0, 2]
     sc_c_stop = corner_pixels[1, 2]
 
-    visible_labels = viewer.layers["Labels"].data[
+    visible_labels = viewer.layers['Labels'].data[
         frame, sc_r_start:sc_r_stop, sc_c_start:sc_c_stop
     ]
 
-    if type(viewer.layers["Labels"].data) == ts.TensorStore:
+    if type(viewer.layers['Labels'].data) == ts.TensorStore:
         visible_labels = visible_labels.read().result()
 
     # start the object
@@ -467,7 +467,7 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
     mask = np.array(cell.mask)
     area = mask.sum()
 
-    cell_dict = {"area": int(area)}
+    cell_dict = {'area': int(area)}
 
     if ch_list is None:
         return cell_dict
@@ -480,9 +480,9 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
         anti_aliasing=False,
     )
     cell_in_cyto_mask = np.zeros_like(cyto_mask)
-    cell_in_cyto_mask[
-        ring_width:-ring_width, ring_width:-ring_width
-    ] = cell.mask
+    cell_in_cyto_mask[ring_width:-ring_width, ring_width:-ring_width] = (
+        cell.mask
+    )
     cyto_mask[cell_in_cyto_mask] = 0
 
     # check how to cut boxes
@@ -510,7 +510,7 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
 
     # get signals for all the channels
     if ch_names is None:
-        ch_names = [f"ch{i}" for i in range(len(ch_list))]
+        ch_names = [f'ch{i}' for i in range(len(ch_list))]
 
     for ch, ch_name in zip(ch_list, ch_names):
         # create a box for the channel
@@ -538,7 +538,7 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
             ch_cyto = ch_cyto.compute()
 
         # add to the dictionary
-        cell_dict[ch_name + "_nuc"] = ch_nuc
-        cell_dict[ch_name + "_cyto"] = ch_cyto
+        cell_dict[ch_name + '_nuc'] = ch_nuc
+        cell_dict[ch_name + '_cyto'] = ch_cyto
 
     return cell_dict

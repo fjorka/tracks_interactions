@@ -20,13 +20,13 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
         self.session = session
         self.viewer = viewer
-        self.labels = self.viewer.layers["Labels"]
+        self.labels = self.viewer.layers['Labels']
 
         # initialize graph
         self.plot_view = self.addPlot(
-            title="Lineage tree", labels={"bottom": "Time"}
+            title='Lineage tree', labels={'bottom': 'Time'}
         )
-        self.plot_view.hideAxis("left")
+        self.plot_view.hideAxis('left')
         self.t_max = self.viewer.dims.range[0][1]
         self.plot_view.setXRange(0, self.t_max)
         self.plot_view.setMouseEnabled(x=True, y=True)
@@ -62,7 +62,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
             ############################################################
             # find which track was selected
-            dist = float("inf")
+            dist = float('inf')
             selected_n = None
 
             if self.tree is not None:
@@ -84,12 +84,12 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
                 # capture if it tries to get attribute from None
                 try:
-                    self.viewer.status = f"Selected track: {selected_n.name}"
+                    self.viewer.status = f'Selected track: {selected_n.name}'
                     self.labels.selected_label = selected_n.name
 
                 except AttributeError:
                     print(
-                        f"Click at {scene_coords.x()},{scene_coords.x()} translated to {x_val}, {y_val}"
+                        f'Click at {scene_coords.x()},{scene_coords.x()} translated to {x_val}, {y_val}'
                     )
 
             # right click - change of status
@@ -108,10 +108,10 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                     self.update_lineage_display()
 
                     # update viewer status
-                    self.viewer.status = f"Track {selected_n.name} accepted status: {track.accepted_tag}."
+                    self.viewer.status = f'Track {selected_n.name} accepted status: {track.accepted_tag}.'
 
         else:
-            self.viewer.status = "No tree to select from."
+            self.viewer.status = 'No tree to select from.'
 
     def update_family_line(self):
         """
@@ -149,7 +149,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             root = query.root
 
             # update viewer status
-            self.viewer.status = f"Family of track number {root}."
+            self.viewer.status = f'Family of track number {root}.'
 
             # buid the tree
             self.tree = build_Newick_tree(self.session, root)
@@ -158,7 +158,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             self.render_tree_view(self.tree)
 
         else:
-            self.viewer.status = "Error - no such label in the database."
+            self.viewer.status = 'Error - no such label in the database.'
 
     def render_tree_view(self, t):
         """
@@ -169,7 +169,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         active_label = int(self.labels.selected_label)
 
         # render the tree
-        t_rendering = t.render(".")
+        t_rendering = t.render('.')
 
         # add position of y to the rendering
         t = _add_y_rendering(t, t_rendering)
@@ -207,7 +207,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                 # add text
                 if n.accepted is True:
                     text_item = TextItem(
-                        str(node_name), anchor=(1, 1), color="green"
+                        str(node_name), anchor=(1, 1), color='green'
                     )
 
                 else:
@@ -246,12 +246,12 @@ def _add_children(node, df, n=2):
     children = df.loc[df.parent_track_id == node.name, :]
 
     for _, row in children.iterrows():
-        child_node = node.add_child(name=row["track_id"])
+        child_node = node.add_child(name=row['track_id'])
         child_node.add_features(
             num=n,
-            start=row["t_begin"],
-            stop=row["t_end"],
-            accepted=row["accepted_tag"],
+            start=row['t_begin'],
+            stop=row['t_end'],
+            accepted=row['accepted_tag'],
         )
 
         n += 1
@@ -270,17 +270,17 @@ def _add_y_rendering(t, t_rendering):
     t_rendering -
     """
 
-    for n in t.traverse(strategy="preorder"):
+    for n in t.traverse(strategy='preorder'):
         if n.is_root():
             pass
         else:
             y = np.mean(
                 [
-                    t_rendering["node_areas"][n.num][1],
-                    t_rendering["node_areas"][n.num][3],
+                    t_rendering['node_areas'][n.num][1],
+                    t_rendering['node_areas'][n.num][3],
                 ]
             )
-            n.add_feature("y", y)
+            n.add_feature('y', y)
 
     return t
 
@@ -299,7 +299,7 @@ def build_Newick_tree(session, root_id):
     df = pd.read_sql(query.statement, session.bind)
 
     # make sure that the root of this id exists
-    assert len(df) > 0, "No data for this root_id"
+    assert len(df) > 0, 'No data for this root_id'
 
     # create tree
     tree = Tree(name=root_id)
@@ -310,9 +310,9 @@ def build_Newick_tree(session, root_id):
     trunk = tree.add_child(name=root_id)
     trunk.add_features(
         num=1,
-        start=trunk_row["t_begin"].values[0],
-        stop=trunk_row["t_end"].values[0],
-        accepted=bool(trunk_row["accepted_tag"].values[0]),
+        start=trunk_row['t_begin'].values[0],
+        stop=trunk_row['t_end'].values[0],
+        accepted=bool(trunk_row['accepted_tag'].values[0]),
     )
 
     # add children

@@ -19,9 +19,9 @@ Base = declarative_base()
 
 
 class CellDB(Base):
-    __tablename__ = "cells"
+    __tablename__ = 'cells'
 
-    track_id = Column(Integer, ForeignKey("tracks.track_id"), primary_key=True)
+    track_id = Column(Integer, ForeignKey('tracks.track_id'), primary_key=True)
     t = Column(Integer, primary_key=True)
 
     id = Column(BigInteger)
@@ -29,10 +29,10 @@ class CellDB(Base):
     row = Column(Integer)
     col = Column(Integer)
 
-    bbox_0 = Column(Integer, default=NO_SHAPE)
-    bbox_1 = Column(Integer, default=NO_SHAPE)
-    bbox_2 = Column(Integer, default=NO_SHAPE)
-    bbox_3 = Column(Integer, default=NO_SHAPE)
+    bbox_0 = Column(Integer, default=NO_SHAPE, primary_key=True)
+    bbox_1 = Column(Integer, default=NO_SHAPE, primary_key=True)
+    bbox_2 = Column(Integer, default=NO_SHAPE, primary_key=True)
+    bbox_3 = Column(Integer, default=NO_SHAPE, primary_key=True)
 
     mask = Column(PickleType, default=NO_SHAPE)
 
@@ -43,11 +43,11 @@ class CellDB(Base):
     tags = Column(JSON, default=NO_SIGNAL)
 
     def __repr__(self):
-        return f"{self.id} from frame {self.t} with track_id {self.track_id} at ({self.row},{self.col})"
+        return f'{self.id} from frame {self.t} with track_id {self.track_id} at ({self.row},{self.col})'
 
 
 class TrackDB(Base):
-    __tablename__ = "tracks"
+    __tablename__ = 'tracks'
 
     track_id = Column(Integer, primary_key=True)
     parent_track_id = Column(Integer)
@@ -65,7 +65,7 @@ class TrackDB(Base):
     tags = Column(JSON, default={})
 
     # Text column for notes
-    notes = Column(String, default="")
+    notes = Column(String, default='')
 
     def __repr__(self):
-        return f"Track {self.track_id} from {self.t_begin} to {self.t_end}"
+        return f'Track {self.track_id} from {self.t_begin} to {self.t_end}'

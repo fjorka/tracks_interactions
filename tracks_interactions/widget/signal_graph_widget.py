@@ -22,7 +22,7 @@ class AddListGraphWidget(QWidget):
         self.session = sql_session
         self.signal_list = signal_list
 
-        add_list_graph_btn = QPushButton("+")
+        add_list_graph_btn = QPushButton('+')
         add_list_graph_btn.clicked.connect(self.add_graph_with_list)
         self.layout().addWidget(add_list_graph_btn)
 
@@ -31,12 +31,12 @@ class AddListGraphWidget(QWidget):
         Add a signal graph with a list of signals.
         """
         if self.signal_list is None:
-            self.viewer.status = "No signal list provided."
+            self.viewer.status = 'No signal list provided.'
         else:
             list_graph_widget = CellGraphWidget(
                 self.viewer, self.session, signal_list=self.signal_list
             )
-            self.viewer.window.add_dock_widget(list_graph_widget, area="right")
+            self.viewer.window.add_dock_widget(list_graph_widget, area='right')
 
 
 class CellGraphWidget(QWidget):
@@ -57,7 +57,7 @@ class CellGraphWidget(QWidget):
         self.setLayout(QVBoxLayout())
 
         self.viewer = napari_viewer
-        self.labels = self.viewer.layers["Labels"]
+        self.labels = self.viewer.layers['Labels']
         self.session = sql_session
         self.signal_list = [None] + signal_list
         self.signal_sel_list = signal_sel_list
@@ -70,7 +70,7 @@ class CellGraphWidget(QWidget):
             len(self.signal_sel_list) != len(self.color_sel_list)
         ):
             self.viewer.status = (
-                "Signal list and color list have different lengths."
+                'Signal list and color list have different lengths.'
             )
             self.signal_sel_list = None
             self.color_sel_list = None
@@ -87,7 +87,7 @@ class CellGraphWidget(QWidget):
             self.addRowButton()
         else:
             for ind in range(len(self.signal_sel_list)):
-                status = "-" if (ind < len(self.signal_sel_list) - 1) else "+"
+                status = '-' if (ind < len(self.signal_sel_list) - 1) else '+'
                 self.addRowButton(
                     status, self.signal_sel_list[ind], self.color_sel_list[ind]
                 )
@@ -99,7 +99,7 @@ class CellGraphWidget(QWidget):
         rowLayout = QHBoxLayout()
 
         for tag in self.tag_dictionary:
-            if tag != "modified":
+            if tag != 'modified':
                 button = QPushButton(tag)
                 button.clicked.connect(
                     lambda _, b=button: self.handleTagButtonClick(
@@ -115,9 +115,9 @@ class CellGraphWidget(QWidget):
         Add shortcuts for tags.
         """
         for tag, sh_cut in self.tag_dictionary.items():
-            if tag != "modified":
+            if tag != 'modified':
                 self.viewer.bind_key(
-                    f"Shift+{sh_cut}",
+                    f'Shift+{sh_cut}',
                     lambda viewer, annotation=tag: self.handleTagButtonClick(
                         viewer, annotation=annotation
                     ),
@@ -140,28 +140,28 @@ class CellGraphWidget(QWidget):
         )
 
         if len(cell_list) == 0:
-            self.viewer.status = "Error - no cell found at this frame."
+            self.viewer.status = 'Error - no cell found at this frame.'
         elif len(cell_list) > 1:
             self.viewer.status = (
-                f"Error - Multiple cells found for {active_cell} at {frame}."
+                f'Error - Multiple cells found for {active_cell} at {frame}.'
             )
         else:
             cell = cell_list[0]
             tags = cell.tags
 
-            status = tags[annotation] if annotation in tags else False
+            status = tags.get(annotation, False)
 
             tags[annotation] = not status
 
             cell.tags = tags
-            flag_modified(cell, "tags")
+            flag_modified(cell, 'tags')
             self.session.commit()
 
             # set status and update graph
-            self.viewer.status = f"Tag {annotation} was set to {not status}."
+            self.viewer.status = f'Tag {annotation} was set to {not status}.'
             self.graph.update_tags()
 
-    def addRowButton(self, status="+", signal=None, color=None):
+    def addRowButton(self, status='+', signal=None, color=None):
         # Create a new row
         rowLayout = QHBoxLayout()
 
@@ -194,9 +194,9 @@ class CellGraphWidget(QWidget):
         colorButton = QPushButton()
         colorButton.setMaximumWidth(40)  # Keep the button small
         if color:
-            colorButton.setStyleSheet(f"background-color: {color}")
+            colorButton.setStyleSheet(f'background-color: {color}')
         else:
-            colorButton.setStyleSheet("background-color: white")
+            colorButton.setStyleSheet('background-color: white')
         colorButton.clicked.connect(lambda: self.selectColor(colorButton))
 
         return colorButton
@@ -205,7 +205,7 @@ class CellGraphWidget(QWidget):
         # Open a color dialog and set the selected color as the button's background
         color = QColorDialog.getColor()
         if color.isValid():
-            button.setStyleSheet(f"background-color: {color.name()}")
+            button.setStyleSheet(f'background-color: {color.name()}')
             self.onSelection()
 
     def onSelection(self):
@@ -215,7 +215,7 @@ class CellGraphWidget(QWidget):
 
         # get info about selected signals
         for i in range(self.btn_offset, self.layout().count()):
-            self.viewer.status = "Selection changed1"
+            self.viewer.status = 'Selection changed1'
             signal = self.layout().itemAt(i).itemAt(0).widget().currentText()
             signal_sel_list.append(signal)
             color = (
@@ -229,19 +229,19 @@ class CellGraphWidget(QWidget):
                 .name()
             )
             color_sel_list.append(color)
-        self.viewer.status = "Selection changed3"
+        self.viewer.status = 'Selection changed3'
         self.graph.signal_list = signal_sel_list
         self.graph.color_list = color_sel_list
 
-        self.viewer.status = f"Selected signals: {signal_sel_list} with colors: {color_sel_list}"
+        self.viewer.status = f'Selected signals: {signal_sel_list} with colors: {color_sel_list}'
 
         # update graph
         self.graph.update_graph_all()
 
     def handleButtonClick(self, button):
-        if button.text() == "+":
+        if button.text() == '+':
             self.addRowButton()
-            button.setText("-")
+            button.setText('-')
         else:  # The button is a '-' button
             self.removeRowButton(button)
 
