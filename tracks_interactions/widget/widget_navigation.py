@@ -1,6 +1,7 @@
 from qtpy.QtWidgets import (
     QCheckBox,
-    QHBoxLayout,
+    QGridLayout,
+    QGroupBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -23,13 +24,25 @@ class TrackNavigationWidget(QWidget):
         # add shortcuts
         self.init_shortcuts()
 
+        widget = QWidget()
+        widget.setLayout(QGridLayout())
+        widget.layout().setContentsMargins(0, 0, 0, 0)
+        navigation_group = QGroupBox()
+        navigation_group.setLayout(QGridLayout())
+        navigation_group.layout().setContentsMargins(0, 0, 0, 0)
+
         # add track navigation
         self.navigation_row = self.add_navigation_control()
+        navigation_group.layout().addWidget(self.navigation_row, 0, 0)
 
         # add checkbox for following the object
         self.follow_object_checkbox = self.add_follow_object_checkbox()
+        navigation_group.layout().addWidget(self.follow_object_checkbox, 1, 0)
         # set initial the default status to checked
         self.follow_object_checkbox.setChecked(True)
+
+        widget.layout().addWidget(navigation_group)
+        self.layout().addWidget(widget)
 
         # build labels layer
         self.build_labels()
@@ -136,18 +149,15 @@ class TrackNavigationWidget(QWidget):
         """
 
         navigation_row = QWidget()
-        navigation_row.setLayout(QHBoxLayout())
-        navigation_row.layout().setContentsMargins(0, 0, 0, 0)
+        navigation_row.setLayout(QGridLayout())
 
         self.start_track_btn = self.add_start_track_btn()
         self.center_object_btn = self.add_center_object_btn()
         self.end_track_btn = self.add_end_track_btn()
 
-        navigation_row.layout().addWidget(self.start_track_btn)
-        navigation_row.layout().addWidget(self.center_object_btn)
-        navigation_row.layout().addWidget(self.end_track_btn)
-
-        self.layout().addWidget(navigation_row)
+        navigation_row.layout().addWidget(self.start_track_btn, 0, 0)
+        navigation_row.layout().addWidget(self.center_object_btn, 0, 1)
+        navigation_row.layout().addWidget(self.end_track_btn, 0, 2)
 
         return navigation_row
 
@@ -294,8 +304,6 @@ class TrackNavigationWidget(QWidget):
         follow_object_checkbox.stateChanged.connect(
             self.followBoxStateChanged_function
         )
-
-        self.layout().addWidget(follow_object_checkbox)
 
         return follow_object_checkbox
 

@@ -3,6 +3,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QGridLayout,
+    QGroupBox,
     QLabel,
     QPushButton,
     QSpinBox,
@@ -33,12 +34,23 @@ class ModificationWidget(QWidget):
         self.ch_names = ch_names
         self.ring_width = ring_width
 
+        widget = QWidget()
+        widget.setLayout(QGridLayout())
+        widget.layout().setContentsMargins(0, 0, 0, 0)
+        mod_group = QGroupBox()
+        mod_group.setLayout(QGridLayout())
+        mod_group.layout().setContentsMargins(0, 0, 0, 0)
+
         # add track modification
         self.modification_row = self.add_track_modification_control()
+        mod_group.layout().addWidget(self.modification_row, 0, 0)
 
         # add cell modification
         self.mod_cell_btn = self.add_mod_cell_btn()
-        self.layout().addWidget(self.mod_cell_btn)
+        mod_group.layout().addWidget(self.mod_cell_btn, 1, 0)
+
+        widget.layout().addWidget(mod_group)
+        self.layout().addWidget(widget)
 
         # add a keyboard shortcut for label modification
         self.viewer.bind_key(
@@ -58,6 +70,7 @@ class ModificationWidget(QWidget):
 
         # Create the grid layout
         modification_row.setLayout(QGridLayout())
+        modification_row.layout().setContentsMargins(0, 0, 0, 0)
 
         # Create the first row widgets
         labelT2 = QLabel('active')
@@ -101,8 +114,6 @@ class ModificationWidget(QWidget):
         modification_row.layout().addWidget(self.connect_track_btn, 1, 2)
         modification_row.layout().addWidget(self.del_track_btn, 1, 3)
         modification_row.layout().addWidget(self.new_track_btn, 1, 4)
-
-        self.layout().addWidget(modification_row)
 
         return modification_row
 
