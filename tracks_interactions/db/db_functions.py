@@ -381,7 +381,7 @@ def cellsDB_after_trackDB(
     session.commit()
 
 
-def trackDB_after_cellDB(session, cell_id):
+def trackDB_after_cellDB(session, cell_id, current_frame):
     """
     Function to deal with tracks upon cell removal/adding
     cell_id - id of the removed cell
@@ -390,20 +390,57 @@ def trackDB_after_cellDB(session, cell_id):
 
     track = session.query(TrackDB).filter(TrackDB.track_id == cell_id).first()
 
-    if track is not None:
+    # create a new track object if necessary
+    if track is None:
 
-        cells_t = (
-            session.query(CellDB.t).filter(CellDB.track_id == cell_id).all()
+        track = TrackDB(
+            track_id=cell_id,
+            t_begin=current_frame,
+            t_end=current_frame,
+            parent_track_id=-1,
+            root=cell_id,
         )
+        session.add(track)
+        session.commit()
+
+    # query for cells
+    cells_t = session.query(CellDB.t).filter(CellDB.track_id == cell_id).all()
+
+    # there are cells - adjust the track
+    if len(cells_t) > 0:
+
         cells_t = [cell[0] for cell in cells_t]
 
         t_min = min(cells_t)
         t_max = max(cells_t)
 
-        track.t_begin = t_min
-        track.t_end = t_max
+        if track.t_begin != t_min:
+            # cell added to the left
+            # cut off this track
+            _, new_track = cut_trackDB(session, cell_id, track.t_begin)
+            track.t_begin = t_min
 
-        session.commit()
+        if track.t_end != t_max:
+            # cell added to the right
+            # cut off the offspring
+            offspring = (
+                session.query(TrackDB)
+                .filter(TrackDB.parent_track_id == cell_id)
+                .all()
+            )
+
+            for child in offspring:
+                _, new_track = cut_trackDB(
+                    session, child.track_id, child.t_begin
+                )
+
+            track.t_end = t_max
+
+    # remove the track
+    else:
+        session.delete(track)
+
+    session.commit()
 
 
 def remove_CellDB(session, cell_id, current_frame):
@@ -418,11 +455,16 @@ def remove_CellDB(session, cell_id, current_frame):
         .first()
     )
 
-    session.delete(cell)
-    session.commit()
+    if cell is not None:
 
-    # deal with the tracks
-    trackDB_after_cellDB(session, cell_id)
+        session.delete(cell)
+        session.commit()
+
+        # deal with the tracks
+        trackDB_after_cellDB(session, cell_id, current_frame)
+
+    else:
+        print('Cell not found')
 
 
 def add_new_core_CellDB(session, current_frame, cell):
@@ -481,7 +523,7 @@ def add_new_CellDB(
     session.commit()
 
     # deal with the tracks
-    trackDB_after_cellDB(session, cell_db.track_id)
+    trackDB_after_cellDB(session, cell_db.track_id, current_frame)
 
 
 def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):

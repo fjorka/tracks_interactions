@@ -87,7 +87,9 @@ class TrackNavigationWidget(QWidget):
         Function to build the labels layer based on db content
         """
 
-        if self.viewer.layers['Labels'].visible:
+        if ('Labels' in self.viewer.layers) and (
+            self.viewer.layers['Labels'].visible
+        ):
             current_frame = self.viewer.dims.current_step[0]
 
             # clear labels

@@ -3,9 +3,13 @@ import numpy as np
 import yaml
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt
+from qtpy.QtGui import QPixmap
 from qtpy.QtWidgets import (
     QGridLayout,
+    QHBoxLayout,
+    QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -16,19 +20,21 @@ import napari
 
 
 class SettingsWidget(QWidget):
-    def __init__(self, viewer, create_widgets_callback=None):
+    def __init__(
+        self, viewer, create_widgets_callback=None, clear_widgets_callback=None
+    ):
 
         super().__init__()
 
         self.viewer = viewer
         self.create_widgets_callback = create_widgets_callback
+        self.clear_widgets_callback = clear_widgets_callback
+        self.added_widgets = []
 
         self.setStyleSheet(napari.qt.get_stylesheet(theme_id='dark'))
 
         self.mWidget = self.mainWidget()
         self.mWidget.layout().setAlignment(Qt.AlignTop)
-
-        self.added_widgets = []
 
         self.setLayout(QVBoxLayout())
         self.layout().setAlignment(Qt.AlignTop)
@@ -41,13 +47,47 @@ class SettingsWidget(QWidget):
 
         widget = QWidget()
         widget.setLayout(QGridLayout())
+        widget.layout().setAlignment(Qt.AlignTop)
 
-        btn_load = QtWidgets.QPushButton('Open Config File')
+        self.logo_widget = self.createLogoWidget()
+
+        btn_load = QtWidgets.QPushButton('Load Tracking')
         btn_load.clicked.connect(self.openFileDialog)
 
-        widget.layout().addWidget(btn_load, 0, 0)
+        widget.layout().addWidget(self.logo_widget, 0, 0)
+        widget.layout().addWidget(btn_load, 1, 0)
 
-        self.widget_line = 1
+        self.widget_line = 2
+
+        return widget
+
+    def createLogoWidget(self):
+        """
+        Creates a logo widget
+        """
+
+        # get logo image
+        logo_path = r'../tracks_interactions/icons/track_gardener_logo.png'
+        logo = QPixmap(logo_path)
+
+        logo_label = QLabel()
+        logo_label.setPixmap(logo)
+        logo_label.setMaximumHeight(300)
+        logo_label.setMaximumWidth(300)
+        logo_label.setScaledContents(True)
+
+        sp1 = QWidget()
+        sp1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        sp2 = QWidget()
+        sp2.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        widget = QWidget()
+        widget.setLayout(QHBoxLayout())
+        widget.layout().setAlignment(Qt.AlignTop)
+        widget.layout().addWidget(sp1)
+        widget.layout().addWidget(logo_label)
+        widget.layout().addWidget(sp2)
 
         return widget
 
@@ -71,42 +111,22 @@ class SettingsWidget(QWidget):
                 self.mWidget.layout().removeWidget(widget)
             self.added_widgets = []
 
-            # config_group = QGroupBox()
-            # config_group.setLayout(QGridLayout())
-            # self.added_widgets.append(config_group)
-            # self.mWidget.layout().addWidget(config_group, self.widget_line, 0)
-            # self.widget_line += 1
+            if self.clear_widgets_callback is not None:
+                self.clear_widgets_callback()
 
-            # # display info of the config file itself
-            # l = QLabel("Config File Path:")
-            # config_group.layout().addWidget(l, 0, 0)
-
-            # l = QLabel(fileName)
-            # config_group.layout().addWidget(l, 1, 0)
-
-            # # horizontal line
-            # space = QWidget()
-            # space.setFixedHeight(4)
-            # self.mWidget.layout().addWidget(space, self.widget_line, 0)
-            # self.added_widgets.append(space)
-            # self.widget_line += 1
-
-            # display unmutable config content
-            # self.displayUnmutableConfig()
+            self.loadExperiment()
+            self.loadTracking()
 
             # display load experiment button
-            pb = QPushButton('Load Data')
-            pb.clicked.connect(self.loadExperiment)
+            pb = QPushButton('Save Settings')
+            # pb.clicked.connect(self.loadExperiment)
             self.mWidget.layout().addWidget(pb, self.widget_line, 0)
             self.added_widgets.append(pb)
             self.widget_line += 1
 
-            # display mutable config content
-            # self.displayMutableConfig()
-
             # display load widgets button
-            pb = QPushButton('Load Tracking')
-            pb.clicked.connect(self.loadTracking)
+            pb = QPushButton('Add graph')
+            # pb.clicked.connect(self.loadTracking)
             self.added_widgets.append(pb)
             self.mWidget.layout().addWidget(pb, self.widget_line, 0)
             self.widget_line += 1
@@ -121,80 +141,17 @@ class SettingsWidget(QWidget):
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
 
-    def displayUnmutableConfig(self):
-        """
-        display the unmutable config
-        """
-
-        # # add database as a group
-        # db_group = QGroupBox()
-        # db_group.setLayout(QGridLayout())
-        # self.added_widgets.append(db_group)
-        # self.mWidget.layout().addWidget(db_group, self.widget_line, 0)
-        # self.widget_line += 1
-
-        # l = QLabel('Database Path: ')
-        # l.setWordWrap(True)
-        # db_group.layout().addWidget(l, 0, 0)
-
-        # l = QLabel(self.database_path)
-        # db_group.layout().addWidget(l, 1, 0)
-
-        # # add channels as a group
-        # channels_group = QGroupBox()
-        # channels_group.setLayout(QGridLayout())
-        # self.added_widgets.append(channels_group)
-        # self.mWidget.layout().addWidget(channels_group, self.widget_line, 0)
-        # self.widget_line += 1
-
-        # ind = 0
-        # for ch in self.channels_list:
-        #     channel_name = ch.get('name', 'Unnamed')
-        #     channel_path = ch.get('path', '')
-
-        #     l = QLabel(f'Channel {channel_name}: ')
-        #     channels_group.layout().addWidget(l, ind, 0)
-        #     ind += 1
-
-        #     l = QLabel(channel_path)
-        #     channels_group.layout().addWidget(l, ind, 0)
-        #     ind += 1
-
-    def displayMutableConfig(self):
-        """
-        display the mutable config
-        """
-
-        # # add graphs as a group
-        # graphs_group = QGroupBox()
-        # graphs_group.setLayout(QGridLayout())
-        # self.added_widgets.append(graphs_group)
-        # self.mWidget.layout().addWidget(graphs_group, self.widget_line, 0)
-        # self.widget_line += 1
-
-        # ind = 0
-        # for gr in self.graphs_list:
-        #     graph_name = gr.get('name', 'Unnamed')
-        #     graph_signals = gr.get('signals', [])
-
-        #     l = QLabel(f'Graph {graph_name}: ')
-        #     graphs_group.layout().addWidget(l, ind, 0)
-        #     ind += 1
-
-        #     for signal in graph_signals:
-
-        #         l = QLabel(signal)
-        #         graphs_group.layout().addWidget(l, ind, 0)
-        #         ind += 1
-
     def loadExperiment(self):
         """
         load the experiment
         """
 
         # remove all previous layers
-        for layer in self.viewer.layers.copy():
-            self.viewer.layers.remove(layer.name)
+
+        layers_list = [x.name for x in self.viewer.layers]
+
+        for layer in layers_list:
+            self.viewer.layers.remove(layer)
 
         ############################################################################################
         ############################################################################################
@@ -211,6 +168,8 @@ class SettingsWidget(QWidget):
             for level in range(1, 5):
                 ch_list.append(da.from_zarr(channel_path, level))
 
+            self.channels_data_list.append(ch_list[0])
+
             self.viewer.add_image(
                 ch_list,
                 name=channel_name,
@@ -218,7 +177,6 @@ class SettingsWidget(QWidget):
                 blending='additive',
                 contrast_limits=[0, 2048],
             )
-            self.channels_data_list.append(ch_list)
 
         # create empty labels and add to the viewer
         empty_labels = np.zeros(

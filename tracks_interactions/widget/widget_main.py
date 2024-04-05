@@ -29,6 +29,10 @@ class TrackGardener(QWidget):
         viewer = napari.current_viewer() if viewer is None else viewer
         self.viewer = viewer
 
+        self.napari_widgets = []
+        self.navigation_widget = None
+        self.modification_widget = None
+
         self.setStyleSheet(napari.qt.get_stylesheet(theme_id='dark'))
         self.setLayout(QVBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
@@ -41,7 +45,9 @@ class TrackGardener(QWidget):
         self.tabwidget = QTabWidget()
 
         # 1st tab
-        self.settings_window = SettingsWidget(viewer, self.create_widgets)
+        self.settings_window = SettingsWidget(
+            viewer, self.create_widgets, self.clear_widgets
+        )
         self.tabwidget.addTab(self.settings_window, 'Settings')
 
         # 2nd tab (initially empty)
@@ -49,6 +55,7 @@ class TrackGardener(QWidget):
         self.tab2.setLayout(QGridLayout())
         self.tab2.layout().setAlignment(Qt.AlignTop)
         self.tab2.layout().setContentsMargins(0, 0, 0, 0)
+        self.tab2.setMinimumWidth(500)
         self.tabwidget.addTab(self.tab2, 'Curating')
 
         # add tab widget to the layout
@@ -60,6 +67,37 @@ class TrackGardener(QWidget):
         scroll_area.setWidgetResizable(True)
 
         self.layout().addWidget(scroll_area)
+
+    def clear_widgets(self):
+        """
+        Remove all widgets from the second tab.
+        """
+
+        # remove graph widgets
+        if len(self.napari_widgets) > 0:
+            for widget in self.napari_widgets:
+                self.viewer.window.remove_dock_widget(widget)
+            self.napari_widgets = []
+
+            # disconnect labels connections
+            self.viewer.camera.events.zoom.disconnect(
+                self.navigation_widget.build_labels
+            )
+            self.viewer.camera.events.center.disconnect(
+                self.navigation_widget.build_labels
+            )
+            self.viewer.layers['Labels'].events.visible.disconnect(
+                self.navigation_widget.build_labels
+            )
+
+        # remove widgets from tab2
+        if self.navigation_widget is not None:
+            self.navigation_widget.setParent(None)
+            self.navigation_widget.deleteLater()
+
+        if self.modification_widget is not None:
+            self.modification_widget.setParent(None)
+            self.modification_widget.deleteLater()
 
     def create_widgets(
         self,
@@ -78,6 +116,7 @@ class TrackGardener(QWidget):
         # add lineage graph
         fam_plot_widget = FamilyGraphWidget(self.viewer, session)
         self.viewer.window.add_dock_widget(fam_plot_widget, area='bottom')
+        self.napari_widgets.append(fam_plot_widget)
 
         # add navigation widget
         self.navigation_widget = TrackNavigationWidget(viewer, session)
@@ -114,6 +153,7 @@ class TrackGardener(QWidget):
             self.viewer.window.add_dock_widget(
                 graph_widget, area='right', name=graph_name
             )
+            self.napari_widgets.append(graph_widget)
 
         # switch to the second tab
         self.tabwidget.setCurrentIndex(1)

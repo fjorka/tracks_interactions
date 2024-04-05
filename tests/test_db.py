@@ -1,14 +1,20 @@
+from unittest.mock import MagicMock
+
+import numpy as np
 import pytest
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.orm import make_transient, sessionmaker
 
 from tracks_interactions.db.db_functions import (
+    add_new_core_CellDB,
+    cellsDB_after_trackDB,
     cut_trackDB,
     delete_trackDB,
     get_descendants,
     integrate_trackDB,
-    modify_track_cellsDB,
     newTrack_number,
+    remove_CellDB,
+    trackDB_after_cellDB,
 )
 from tracks_interactions.db.db_model import NO_PARENT, CellDB, TrackDB
 
@@ -64,6 +70,7 @@ def db_session():
     # 1-3 (11 - 20)
     # 3-4 (21 - 40)
     # 5 unconnected starts (41 - 45)
+    # Track 20426 from 43 to 80
     new_track = TrackDB(
         track_id=1, parent_track_id=NO_PARENT, root=1, t_begin=0, t_end=10
     )
@@ -409,8 +416,8 @@ def test_cut_merge_trackDB(db_session):
     )
 
 
-def test_modify_track_cellsDB_after(db_session):
-    """Test checking whether the modify_track_cellsDB function works correctly."""
+def test_cellsDB_after_trackDB(db_session):
+    """Test modifications in the cells table after a track is moodified."""
 
     active_label = 20422
 
@@ -422,11 +429,11 @@ def test_modify_track_cellsDB_after(db_session):
     current_frame = 3
     new_track = 100
 
-    _ = modify_track_cellsDB(
+    _ = cellsDB_after_trackDB(
         db_session, active_label, current_frame, new_track, direction='after'
     )
 
-    # assert that there are only 5 objects of old track in the cell table after cut
+    # assert that there are only 3 objects of old track in the cell table after cut
     assert (
         len(db_session.query(CellDB).filter_by(track_id=active_label).all())
         == current_frame
@@ -439,7 +446,7 @@ def test_modify_track_cellsDB_after(db_session):
 
 
 def test_modify_track_cellsDB_before(db_session):
-    """Test checking whether the modify_track_cellsDB function works correctly."""
+    """Test checking whether the cellsDB_after_trackDB - in before direction."""
 
     active_label = 20422
 
@@ -451,7 +458,7 @@ def test_modify_track_cellsDB_before(db_session):
     current_frame = 5
     new_track = 100
 
-    _ = modify_track_cellsDB(
+    _ = cellsDB_after_trackDB(
         db_session, active_label, current_frame, new_track, direction='before'
     )
 
@@ -459,12 +466,6 @@ def test_modify_track_cellsDB_before(db_session):
     assert len(
         db_session.query(CellDB).filter_by(track_id=active_label).all()
     ) == (org_stop - current_frame + 1)
-
-    # assert that there is expected number of objects in new track
-    assert (
-        len(db_session.query(CellDB).filter_by(track_id=new_track).all())
-        == current_frame
-    )
 
     # assert that there is expected number of objects in new track
     assert (
@@ -865,3 +866,169 @@ def test_double_cut_connect(db_session):
         assert t2_before.root == t2_before.track_id
     else:
         assert t2_before.root == t2.root
+
+
+def test_trackDB_after_cellDB_no_change(db_session):
+    """
+    Tests if the modification happened at a time frame inside of a track
+    """
+
+    t1_ind = 20422
+    current_frame = 10
+
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    t1 = TrackDB()
+    for key in t1_org.__dict__:
+        if (
+            key != '_sa_instance_state'
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t1, key, getattr(t1_org, key))
+
+    # Detach the copy from the session
+    make_transient(t1)
+
+    trackDB_after_cellDB(db_session, t1_ind, current_frame)
+
+    # assert that t1_ind track is not changed
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_end == t1.t_end
+    assert new_t1.t_begin == t1.t_begin
+    assert new_t1.parent_track_id == t1.parent_track_id
+    assert new_t1.root == t1.root
+
+
+def test_trackDB_after_cellDB_new_track(db_session):
+    """
+    Tests if the new cell is added to the database.
+    """
+
+    t1_ind = 400000
+    current_frame = 10
+
+    # assert there is no such track at the beginning
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).all()
+    assert len(t1_org) == 0
+
+    # add mock cell
+    cell_dict = {
+        'label': t1_ind,
+        'area': 0,
+        'bbox': [0, 0, 0, 0],
+        'image': np.zeros([2, 2]),
+    }
+    cell = MagicMock()
+    for key in cell_dict:
+        setattr(cell, key, cell_dict[key])
+    add_new_core_CellDB(db_session, current_frame, cell)
+    # modify tracks table after adding this fake cell
+    trackDB_after_cellDB(db_session, t1_ind, current_frame)
+
+    # assert that t1_ind track is not changed
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_end == current_frame
+    assert new_t1.t_begin == current_frame
+    assert new_t1.parent_track_id == -1
+    assert new_t1.root == t1_ind
+
+
+def test_trackDB_after_cellDB_added_after(db_session):
+    """
+    Tests a modification that extends the track.
+    """
+
+    t1_ind = 20422
+    current_frame = 50
+    d1_ind = 20426
+
+    t1_org = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    t1 = TrackDB()
+    for key in t1_org.__dict__:
+        if (
+            key != '_sa_instance_state'
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(t1, key, getattr(t1_org, key))
+
+    # Detach the copy from the session
+    make_transient(t1)
+
+    d1_org = db_session.query(TrackDB).filter_by(track_id=d1_ind).one()
+
+    # make deep copies because otherwise the objects stay connected to the database
+    d1 = TrackDB()
+    for key in d1_org.__dict__:
+        if (
+            key != '_sa_instance_state'
+        ):  # Exclude the SQLAlchemy instance state
+            setattr(d1, key, getattr(d1_org, key))
+
+    # Detach the copy from the session
+    make_transient(d1)
+
+    # modify tracks table
+    cell_dict = {
+        'label': t1_ind,
+        'area': 0,
+        'bbox': [0, 0, 0, 0],
+        'image': np.zeros([2, 2]),
+    }
+    cell = MagicMock()
+    for key in cell_dict:
+        setattr(cell, key, cell_dict[key])
+
+    add_new_core_CellDB(db_session, current_frame, cell)
+    trackDB_after_cellDB(db_session, t1_ind, current_frame)
+
+    # assert that t1_ind track is not changed
+    new_t1 = db_session.query(TrackDB).filter_by(track_id=t1_ind).one()
+    assert new_t1.t_end == current_frame
+    assert new_t1.t_begin == t1.t_begin
+    assert new_t1.parent_track_id == t1.parent_track_id
+    assert new_t1.root == t1.root
+
+    # assert that the offspring is modified
+    new_d1 = db_session.query(TrackDB).filter_by(track_id=d1_ind).one()
+    assert new_d1.t_end == d1.t_end
+    assert new_d1.t_begin == d1.t_begin
+    assert new_d1.parent_track_id == -1
+    assert new_d1.root == d1_ind
+
+
+def test_remove_CellDB(db_session):
+    """Test - remove a cell"""
+    cell_id = 20422
+    current_frame = 20
+
+    remove_CellDB(db_session, cell_id, current_frame)
+
+    c = (
+        db_session.query(CellDB)
+        .filter_by(track_id=cell_id)
+        .filter_by(t=current_frame)
+        .all()
+    )
+    assert len(c) == 0
+
+
+def test_remove_CellDB_first(db_session):
+    """Test - remove a cell"""
+    cell_id = 20426
+    current_frame = 43
+
+    remove_CellDB(db_session, cell_id, current_frame)
+
+    c = (
+        db_session.query(CellDB)
+        .filter_by(track_id=cell_id)
+        .filter_by(t=current_frame)
+        .all()
+    )
+    assert len(c) == 0
+
+    t = db_session.query(TrackDB).filter_by(track_id=cell_id).one()
+    assert t.t_begin == current_frame + 1
+    assert t.parent_track_id == -1
+    assert t.root == cell_id
