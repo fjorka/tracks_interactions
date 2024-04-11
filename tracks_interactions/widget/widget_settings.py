@@ -17,6 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import napari
+from tracks_interactions.widget.signal_graph_widget import CellGraphWidget
 
 
 class SettingsWidget(QWidget):
@@ -105,31 +106,38 @@ class SettingsWidget(QWidget):
             # load config content
             self.loadConfigFile(fileName)
 
-            # remove all previous widgets
-            for widget in self.added_widgets:
-                widget.hide()
-                self.mWidget.layout().removeWidget(widget)
-            self.added_widgets = []
+            self.reorganizeWidgets()
 
-            if self.clear_widgets_callback is not None:
-                self.clear_widgets_callback()
+    def reorganizeWidgets(self):
+        """
+        reorganize widgets
+        """
 
-            self.loadExperiment()
-            self.loadTracking()
+        # remove all previous widgets
+        for widget in self.added_widgets:
+            widget.hide()
+            self.mWidget.layout().removeWidget(widget)
+        self.added_widgets = []
 
-            # display load experiment button
-            pb = QPushButton('Save Settings')
-            # pb.clicked.connect(self.loadExperiment)
-            self.mWidget.layout().addWidget(pb, self.widget_line, 0)
-            self.added_widgets.append(pb)
-            self.widget_line += 1
+        if self.clear_widgets_callback is not None:
+            self.clear_widgets_callback()
 
-            # display load widgets button
-            pb = QPushButton('Add graph')
-            # pb.clicked.connect(self.loadTracking)
-            self.added_widgets.append(pb)
-            self.mWidget.layout().addWidget(pb, self.widget_line, 0)
-            self.widget_line += 1
+        self.loadExperiment()
+        self.loadTracking()
+
+        # display load experiment button
+        pb = QPushButton('Save Settings')
+        # pb.clicked.connect(self.loadExperiment)
+        self.mWidget.layout().addWidget(pb, self.widget_line, 0)
+        self.added_widgets.append(pb)
+        self.widget_line += 1
+
+        # display load widgets button
+        pb = QPushButton('Add graph')
+        pb.clicked.connect(self.add_new_graph_widget)
+        self.added_widgets.append(pb)
+        self.mWidget.layout().addWidget(pb, self.widget_line, 0)
+        self.widget_line += 1
 
     def loadConfigFile(self, filePath):
 
@@ -140,10 +148,18 @@ class SettingsWidget(QWidget):
             self.channels_list = config.get('signal_channels', [])
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
+            # get this from the database
+            self.signal_list = [
+                'area',
+                'ch0_nuc',
+                'ch0_cyto',
+                'ch1_nuc',
+                'ch1_cyto',
+            ]
 
     def loadExperiment(self):
         """
-        load the experiment
+        loads napari layers
         """
 
         # remove all previous layers
@@ -206,8 +222,23 @@ class SettingsWidget(QWidget):
                 self.channels_data_list,
                 ch_names,
                 5,
+                self.signal_list,
                 self.graphs_list,
                 self.cell_tags,
             )
 
         self.viewer.status = 'Tracking loaded'
+
+    def add_new_graph_widget(self):
+
+        graph_widget = CellGraphWidget(
+            self.viewer,
+            self.session,
+            self.signal_list,
+            tag_dictionary=self.cell_tags,
+        )
+
+        self.viewer.window.add_dock_widget(
+            graph_widget, area='bottom', name='New Graph'
+        )
+        self.napari_widgets.append(graph_widget)

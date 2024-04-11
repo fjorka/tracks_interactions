@@ -1,18 +1,21 @@
 import numpy as np
-from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 from skimage.measure import regionprops
+from sqlalchemy.orm.attributes import flag_modified
 
 import tracks_interactions.db.db_functions as fdb
+from tracks_interactions.db.db_model import CellDB
 
 
 class ModificationWidget(QWidget):
@@ -23,9 +26,15 @@ class ModificationWidget(QWidget):
         ch_list=None,
         ch_names=None,
         ring_width=5,
+        tag_dictionary=None,
     ):
         super().__init__()
         self.setLayout(QVBoxLayout())
+
+        if tag_dictionary is None:
+            self.tag_dictionary = {}
+        else:
+            self.tag_dictionary = tag_dictionary
 
         self.viewer = napari_viewer
         self.labels = self.viewer.layers['Labels']
@@ -34,23 +43,42 @@ class ModificationWidget(QWidget):
         self.ch_names = ch_names
         self.ring_width = ring_width
 
-        widget = QWidget()
-        widget.setLayout(QGridLayout())
-        widget.layout().setContentsMargins(0, 0, 0, 0)
         mod_group = QGroupBox()
         mod_group.setLayout(QGridLayout())
-        mod_group.layout().setContentsMargins(0, 0, 0, 0)
+        mod_group.layout().addWidget(QLabel('change tracks:'))
 
         # add track modification
-        self.modification_row = self.add_track_modification_control()
-        mod_group.layout().addWidget(self.modification_row, 0, 0)
+        self.modification_panel = self.add_track_modification_control()
+        mod_group.layout().addWidget(self.modification_panel)
+
+        self.layout().addWidget(mod_group)
+
+        spacer_00 = QWidget()
+        spacer_00.setFixedHeight(4)
+        spacer_00.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.layout().addWidget(spacer_00)
+
+        # add tagging
+        if len(self.tag_dictionary) > 0:
+
+            tag_widget = self.add_tag_buttons()
+
+            tag_group = QGroupBox()
+            tag_group.setLayout(QGridLayout())
+            tag_group.layout().addWidget(QLabel('add tags:'))
+            tag_group.layout().addWidget(tag_widget)
+            self.layout().addWidget(tag_group)
+
+            self.add_tag_shortcuts()
+
+        spacer_01 = QWidget()
+        spacer_01.setFixedHeight(4)
+        spacer_01.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.layout().addWidget(spacer_01)
 
         # add cell modification
         self.mod_cell_btn = self.add_mod_cell_btn()
-        mod_group.layout().addWidget(self.mod_cell_btn, 1, 0)
-
-        widget.layout().addWidget(mod_group)
-        self.layout().addWidget(widget)
+        self.layout().addWidget(self.mod_cell_btn)
 
         # add a keyboard shortcut for label modification
         self.viewer.bind_key(
@@ -66,56 +94,55 @@ class ModificationWidget(QWidget):
         Add a set of buttons to modify tracks
         """
 
-        modification_row = QWidget()
+        modification_panel = QWidget()
 
         # Create the grid layout
-        modification_row.setLayout(QGridLayout())
-        modification_row.layout().setContentsMargins(0, 0, 0, 0)
+        modification_panel.setLayout(QGridLayout())
 
         # Create the first row widgets
-        labelT2 = QLabel('active')
-        self.T2_box = self.add_T_spinbox(self.labels.selected_label)
-        arrowLabel = QLabel(
-            '→', alignment=Qt.AlignCenter
-        )  # Big arrow label, centered
-        arrowLabel.setStyleSheet('font-size: 24px;')  # Making the arrow bigger
-        labelT1 = QLabel('upstream')
         self.T1_box = self.add_T_spinbox(self.labels.selected_label)
+        labelT1 = QLabel('previous')
+        self.T2_box = self.add_T_spinbox(self.labels.selected_label)
+        labelT2 = QLabel('active')
 
         # connect spinboxed to the event of changing the track
         self.labels.events.selected_label.connect(self.T_function)
         # connect change of T2 to change of active label
-        # self.T2_box.valueChanged.connect(self.T2_change_function)
         self.T2_box.editingFinished.connect(self.T2_change_function)
 
-        # Add first row widgets to the layout
-        modification_row.layout().addWidget(labelT2, 0, 0)  # Row 0, Column 0
-        modification_row.layout().addWidget(
-            self.T2_box, 0, 1
-        )  # Row 0, Column 1
-        modification_row.layout().addWidget(
-            arrowLabel, 0, 2
-        )  # Row 0, Column 2
-        modification_row.layout().addWidget(labelT1, 0, 3)  # Row 0, Column 3
-        modification_row.layout().addWidget(
-            self.T1_box, 0, 4
-        )  # Row 0, Column 4
-
         # create the buttons
-        self.cut_track_btn = self.add_cut_track_btn()
         self.merge_track_btn = self.add_merge_track_btn()
+        self.merge_track_btn.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed
+        )
         self.connect_track_btn = self.add_connect_track_btn()
+        self.connect_track_btn.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed
+        )
+
+        self.cut_track_btn = self.add_cut_track_btn()
         self.del_track_btn = self.add_del_track_btn()
         self.new_track_btn = self.add_new_track_btn()
 
-        # Add second row widgets to the layout
-        modification_row.layout().addWidget(self.cut_track_btn, 1, 0)
-        modification_row.layout().addWidget(self.merge_track_btn, 1, 1)
-        modification_row.layout().addWidget(self.connect_track_btn, 1, 2)
-        modification_row.layout().addWidget(self.del_track_btn, 1, 3)
-        modification_row.layout().addWidget(self.new_track_btn, 1, 4)
+        # create the layout
+        modification_panel.layout().addWidget(labelT1, 0, 0, 2, 3)
+        modification_panel.layout().addWidget(self.T1_box, 2, 0, 2, 3)
 
-        return modification_row
+        modification_panel.layout().addWidget(self.merge_track_btn, 1, 3, 2, 1)
+        modification_panel.layout().addWidget(
+            self.connect_track_btn, 3, 3, 2, 1
+        )
+
+        modification_panel.layout().addWidget(labelT2, 0, 4, 2, 3)
+        modification_panel.layout().addWidget(self.T2_box, 2, 4, 2, 3)
+
+        # modification_panel.layout().addWidget(spacer_00, 4, 0, 1, 5)
+
+        modification_panel.layout().addWidget(self.new_track_btn, 5, 4, 2, 1)
+        modification_panel.layout().addWidget(self.cut_track_btn, 5, 5, 2, 1)
+        modification_panel.layout().addWidget(self.del_track_btn, 5, 6, 2, 1)
+
+        return modification_panel
 
     def add_T_spinbox(self, value):
         """
@@ -465,6 +492,80 @@ class ModificationWidget(QWidget):
         self.labels.selected_label = new_track
 
         self.viewer.status = f'You can start track {new_track}.'
+
+    ################################################################################################
+    ################################################################################################
+    def add_tag_buttons(self):
+
+        tagWidget = QWidget()
+        tagWidget.setLayout(QHBoxLayout())
+
+        for tag in self.tag_dictionary:
+            if tag != 'modified':
+                button = QPushButton(tag)
+                button.clicked.connect(
+                    lambda _, b=button: self.handleTagButtonClick(
+                        annotation=b.text()
+                    )
+                )
+                tagWidget.layout().addWidget(button)
+
+        return tagWidget
+
+    def add_tag_shortcuts(self):
+        """
+        Add shortcuts for tags.
+        """
+        for tag, sh_cut in self.tag_dictionary.items():
+            if tag != 'modified':
+                self.viewer.bind_key(
+                    f'Shift+{sh_cut}',
+                    lambda viewer, annotation=tag: self.handleTagButtonClick(
+                        viewer, annotation=annotation
+                    ),
+                    overwrite=True,
+                )
+
+    def handleTagButtonClick(self, viewer=None, annotation=None):
+        """
+        Add a tag to the current cell.
+        """
+
+        active_cell = self.labels.selected_label
+        frame = self.viewer.dims.current_step[0]
+
+        cell_list = (
+            self.session.query(CellDB)
+            .filter(CellDB.t == frame)
+            .filter(CellDB.track_id == active_cell)
+            .all()
+        )
+
+        if len(cell_list) == 0:
+            self.viewer.status = 'Error - no cell found at this frame.'
+        elif len(cell_list) > 1:
+            self.viewer.status = (
+                f'Error - Multiple cells found for {active_cell} at {frame}.'
+            )
+        else:
+            cell = cell_list[0]
+            tags = cell.tags
+
+            status = tags.get(annotation, False)
+
+            tags[annotation] = not status
+
+            cell.tags = tags
+            flag_modified(cell, 'tags')
+            self.session.commit()
+
+            # set status and update graph
+            self.viewer.status = f'Tag {annotation} was set to {not status}.'
+
+            # round trip to refresh the query and the viewer
+            sel_label = self.labels.selected_label
+            self.labels.selected_label = -1
+            self.labels.selected_label = sel_label
 
     ################################################################################################
     ################################################################################################

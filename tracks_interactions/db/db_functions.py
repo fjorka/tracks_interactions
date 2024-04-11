@@ -142,9 +142,19 @@ def cut_trackDB(session, active_label, current_frame):
 
     # there is a true cut
     elif record.t_begin < current_frame:
+
         # modify the end of the track
         org_t_end = record.t_end
-        record.t_end = current_frame - 1
+
+        # account for a situation when it's a gap around the cut
+        cells_t = (
+            session.query(CellDB.t).filter_by(track_id=active_label).all()
+        )
+        t_start = min(
+            [cell[0] for cell in cells_t if cell[0] >= current_frame]
+        )
+        t_stop = max([cell[0] for cell in cells_t if cell[0] < current_frame])
+        record.t_end = t_stop
 
         # add completely new track
         new_track = newTrack_number(session)
@@ -153,7 +163,7 @@ def cut_trackDB(session, active_label, current_frame):
             track_id=new_track,
             parent_track_id=-1,
             root=new_track,
-            t_begin=current_frame,
+            t_begin=t_start,
             t_end=org_t_end,
         )
 

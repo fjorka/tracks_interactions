@@ -70,6 +70,7 @@ def db_session():
     # 1-3 (11 - 20)
     # 3-4 (21 - 40)
     # 5 unconnected starts (41 - 45)
+    # Track 20422 from 0 to 42
     # Track 20426 from 43 to 80
     new_track = TrackDB(
         track_id=1, parent_track_id=NO_PARENT, root=1, t_begin=0, t_end=10
@@ -201,7 +202,7 @@ def test_get_descendants(db_session):
 def test_cut_trackDB(db_session):
     """Test checking that a track is modified correctly."""
 
-    active_label = 1
+    active_label = 20422
     current_frame = 5
 
     new_track_expected = newTrack_number(db_session)
@@ -222,7 +223,7 @@ def test_cut_trackDB(db_session):
     )
     assert (
         db_session.query(TrackDB).filter_by(track_id=new_track).one().t_end
-        == 10
+        == 42
     )
     assert (
         db_session.query(TrackDB)
@@ -237,31 +238,46 @@ def test_cut_trackDB(db_session):
     )
 
     # assert that the old track is modified
-    assert db_session.query(TrackDB).filter_by(track_id=1).one().t_end == 4
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=active_label).one().t_end
+        == 4
+    )
 
     # assert that the children are modified
     assert (
-        db_session.query(TrackDB).filter_by(track_id=2).one().root == new_track
-    )
-    assert (
-        db_session.query(TrackDB).filter_by(track_id=2).one().parent_track_id
+        db_session.query(TrackDB).filter_by(track_id=20423).one().root
         == new_track
     )
     assert (
-        db_session.query(TrackDB).filter_by(track_id=3).one().root == new_track
+        db_session.query(TrackDB)
+        .filter_by(track_id=20423)
+        .one()
+        .parent_track_id
+        == new_track
     )
     assert (
-        db_session.query(TrackDB).filter_by(track_id=3).one().parent_track_id
+        db_session.query(TrackDB).filter_by(track_id=20426).one().root
+        == new_track
+    )
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=20426)
+        .one()
+        .parent_track_id
         == new_track
     )
 
     # assert that the grandchildren are modified
     assert (
-        db_session.query(TrackDB).filter_by(track_id=4).one().root == new_track
+        db_session.query(TrackDB).filter_by(track_id=20425).one().root
+        == new_track
     )
     assert (
-        db_session.query(TrackDB).filter_by(track_id=4).one().parent_track_id
-        == 3
+        db_session.query(TrackDB)
+        .filter_by(track_id=20425)
+        .one()
+        .parent_track_id
+        == 20423
     )
 
 
@@ -356,7 +372,7 @@ def test_cut_trackDB_mitosis(db_session):
 def test_cut_merge_trackDB(db_session):
     """Test checking that a track is modified correctly."""
 
-    active_label = 1
+    active_label = 20422
     current_frame = 5
 
     new_track_expected = newTrack_number(db_session)
@@ -368,7 +384,7 @@ def test_cut_merge_trackDB(db_session):
     assert new_track == new_track_expected
 
     # re-merge new to old
-    t1_ind = 1
+    t1_ind = 20422
     t2_ind = new_track
     _ = integrate_trackDB(db_session, 'merge', t1_ind, t2_ind, current_frame)
 
@@ -382,7 +398,7 @@ def test_cut_merge_trackDB(db_session):
         db_session.query(TrackDB).filter_by(track_id=t1_ind).one().t_begin == 0
     )
     assert (
-        db_session.query(TrackDB).filter_by(track_id=t1_ind).one().t_end == 10
+        db_session.query(TrackDB).filter_by(track_id=t1_ind).one().t_end == 42
     )
     assert (
         db_session.query(TrackDB)
@@ -397,22 +413,40 @@ def test_cut_merge_trackDB(db_session):
     )
 
     # assert that the children are not modified
-    assert db_session.query(TrackDB).filter_by(track_id=2).one().root == t1_ind
     assert (
-        db_session.query(TrackDB).filter_by(track_id=2).one().parent_track_id
+        db_session.query(TrackDB).filter_by(track_id=20423).one().root
         == t1_ind
     )
-    assert db_session.query(TrackDB).filter_by(track_id=3).one().root == t1_ind
     assert (
-        db_session.query(TrackDB).filter_by(track_id=3).one().parent_track_id
+        db_session.query(TrackDB)
+        .filter_by(track_id=20423)
+        .one()
+        .parent_track_id
+        == t1_ind
+    )
+    assert (
+        db_session.query(TrackDB).filter_by(track_id=20426).one().root
+        == t1_ind
+    )
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=20426)
+        .one()
+        .parent_track_id
         == t1_ind
     )
 
     # assert that the grandchildren are not modified
-    assert db_session.query(TrackDB).filter_by(track_id=4).one().root == t1_ind
     assert (
-        db_session.query(TrackDB).filter_by(track_id=4).one().parent_track_id
-        == 3
+        db_session.query(TrackDB).filter_by(track_id=20425).one().root
+        == t1_ind
+    )
+    assert (
+        db_session.query(TrackDB)
+        .filter_by(track_id=20425)
+        .one()
+        .parent_track_id
+        == 20423
     )
 
 
@@ -521,9 +555,9 @@ def test_freely_floating_merge(db_session):
 def test_double_cut_merge(db_session):
     """Test merging tracks when both need to be cut."""
 
-    t1_ind = 1
+    t1_ind = 37401
     t2_ind = 20422
-    current_frame = 5
+    current_frame = 30
 
     expected_new_track = newTrack_number(db_session)
 
@@ -1032,3 +1066,26 @@ def test_remove_CellDB_first(db_session):
     assert t.t_begin == current_frame + 1
     assert t.parent_track_id == -1
     assert t.root == cell_id
+
+
+def test_remove_cell_cut_track(db_session):
+    """
+    Test after encountering a bug of cutting a cell at a next position after removed cell.
+    """
+
+    active_label = 20422
+    current_frame = 20
+
+    remove_CellDB(db_session, active_label, current_frame)
+
+    current_frame = 21
+    new_track = newTrack_number(db_session)
+
+    mitosis, new_track = cut_trackDB(db_session, active_label, current_frame)
+
+    t = db_session.query(TrackDB).filter_by(track_id=active_label).one()
+    # because cell was removed at 20
+    assert t.t_end == current_frame - 2
+
+    t = db_session.query(TrackDB).filter_by(track_id=new_track).one()
+    assert t.t_begin == current_frame
