@@ -2,6 +2,7 @@ from qtpy.QtWidgets import (
     QCheckBox,
     QGridLayout,
     QGroupBox,
+    QLabel,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -24,25 +25,21 @@ class TrackNavigationWidget(QWidget):
         # add shortcuts
         self.init_shortcuts()
 
-        widget = QWidget()
-        widget.setLayout(QGridLayout())
-        widget.layout().setContentsMargins(0, 0, 0, 0)
         navigation_group = QGroupBox()
-        navigation_group.setLayout(QGridLayout())
-        navigation_group.layout().setContentsMargins(0, 0, 0, 0)
+        navigation_group.setLayout(QVBoxLayout())
+        navigation_group.layout().addWidget(QLabel('navigate:'))
 
         # add track navigation
         self.navigation_row = self.add_navigation_control()
-        navigation_group.layout().addWidget(self.navigation_row, 0, 0)
+        navigation_group.layout().addWidget(self.navigation_row)
 
         # add checkbox for following the object
         self.follow_object_checkbox = self.add_follow_object_checkbox()
-        navigation_group.layout().addWidget(self.follow_object_checkbox, 1, 0)
+        navigation_group.layout().addWidget(self.follow_object_checkbox)
         # set initial the default status to checked
         self.follow_object_checkbox.setChecked(True)
 
-        widget.layout().addWidget(navigation_group)
-        self.layout().addWidget(widget)
+        self.layout().addWidget(navigation_group)
 
         # build labels layer
         self.build_labels()
@@ -301,7 +298,7 @@ class TrackNavigationWidget(QWidget):
         """
         Add a checkbox to follow the object.
         """
-        follow_object_checkbox = QCheckBox('Follow track')
+        follow_object_checkbox = QCheckBox('follow track')
 
         follow_object_checkbox.stateChanged.connect(
             self.followBoxStateChanged_function

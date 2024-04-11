@@ -6,9 +6,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy.orm.attributes import flag_modified
 
-from tracks_interactions.db.db_model import CellDB
 from tracks_interactions.graph.signal_graph import SignalGraph
 
 
@@ -63,7 +61,7 @@ class CellGraphWidget(QWidget):
         self.signal_sel_list = signal_sel_list
         self.color_sel_list = color_sel_list
         self.tag_dictionary = tag_dictionary
-        self.btn_offset = 1 if len(self.tag_dictionary) == 0 else 2
+        self.btn_offset = 1
 
         # account for incorrect signal and color list
         if self.signal_sel_list is not None and (
@@ -78,105 +76,60 @@ class CellGraphWidget(QWidget):
         # add graph
         self.graph = self.add_signal_graph()
 
-        if len(tag_dictionary) > 0:
-            self.add_tag_buttons()
-            self.add_tag_shortcuts()
-
         # add matching buttons
-        if self.signal_sel_list is None:
+        if (self.signal_sel_list is None) or (len(self.signal_sel_list) == 0):
             self.addRowButton()
         else:
             for ind in range(len(self.signal_sel_list)):
-                status = '-' if (ind < len(self.signal_sel_list) - 1) else '+'
                 self.addRowButton(
-                    status, self.signal_sel_list[ind], self.color_sel_list[ind]
+                    button=None,
+                    signal=self.signal_sel_list[ind],
+                    color=self.color_sel_list[ind],
                 )
 
             # trigger graph update
             self.graph.update_graph_all()
 
-    def add_tag_buttons(self):
-        rowLayout = QHBoxLayout()
+    def addRowButton(self, button=None, signal=None, color=None):
 
-        for tag in self.tag_dictionary:
-            if tag != 'modified':
-                button = QPushButton(tag)
-                button.clicked.connect(
-                    lambda _, b=button: self.handleTagButtonClick(
-                        annotation=b.text()
-                    )
-                )
-                rowLayout.addWidget(button)
-
-        self.layout().addLayout(rowLayout)
-
-    def add_tag_shortcuts(self):
-        """
-        Add shortcuts for tags.
-        """
-        for tag, sh_cut in self.tag_dictionary.items():
-            if tag != 'modified':
-                self.viewer.bind_key(
-                    f'Shift+{sh_cut}',
-                    lambda viewer, annotation=tag: self.handleTagButtonClick(
-                        viewer, annotation=annotation
-                    ),
-                    overwrite=True,
-                )
-
-    def handleTagButtonClick(self, viewer=None, annotation=None):
-        """
-        Add a tag to the current cell.
-        """
-
-        active_cell = self.labels.selected_label
-        frame = self.viewer.dims.current_step[0]
-
-        cell_list = (
-            self.session.query(CellDB)
-            .filter(CellDB.t == frame)
-            .filter(CellDB.track_id == active_cell)
-            .all()
-        )
-
-        if len(cell_list) == 0:
-            self.viewer.status = 'Error - no cell found at this frame.'
-        elif len(cell_list) > 1:
-            self.viewer.status = (
-                f'Error - Multiple cells found for {active_cell} at {frame}.'
-            )
-        else:
-            cell = cell_list[0]
-            tags = cell.tags
-
-            status = tags.get(annotation, False)
-
-            tags[annotation] = not status
-
-            cell.tags = tags
-            flag_modified(cell, 'tags')
-            self.session.commit()
-
-            # set status and update graph
-            self.viewer.status = f'Tag {annotation} was set to {not status}.'
-            self.graph.update_tags()
-
-    def addRowButton(self, status='+', signal=None, color=None):
         # Create a new row
         rowLayout = QHBoxLayout()
 
         comboBox = self.createSignalComboBox(signal)
         colorButton = self.createColorButton(color)
 
-        button = QPushButton(status)
-        button.setMaximumWidth(40)
-        button.clicked.connect(lambda: self.handleButtonClick(button))
+        add_button = QPushButton('+')
+        add_button.setMaximumWidth(30)
+        add_button.clicked.connect(
+            lambda: self.handleAddButtonClick(add_button)
+        )
+
+        min_button = QPushButton('-')
+        min_button.setMaximumWidth(30)
+        min_button.clicked.connect(
+            lambda: self.handleMinButtonClick(min_button)
+        )
 
         rowLayout.addWidget(comboBox)
         rowLayout.addWidget(colorButton)
-        rowLayout.addWidget(button)
+        rowLayout.addWidget(add_button)
+        rowLayout.addWidget(min_button)
 
-        self.layout().addLayout(rowLayout)
+        # when it's added by click on the button
+        if button is not None:
+
+            for i in range(1, self.layout().count()):
+                layout = self.layout().itemAt(i)
+                if layout.layout().indexOf(button) != -1:
+
+                    self.layout().insertLayout(i + 1, rowLayout)
+        else:
+            self.layout().addLayout(rowLayout)
+
+        # in case we just added the second signal
+        if self.layout().count() == 3:
+            last_row = self.layout().itemAt(1)
+            last_row.itemAt(3).widget().setEnabled(True)
 
     def createSignalComboBox(self, signal=None):
         comboBox = QComboBox()
@@ -192,7 +145,7 @@ class CellGraphWidget(QWidget):
 
     def createColorButton(self, color=None):
         colorButton = QPushButton()
-        colorButton.setMaximumWidth(40)  # Keep the button small
+        colorButton.setMaximumWidth(30)  # Keep the button small
         if color:
             colorButton.setStyleSheet(f'background-color: {color}')
         else:
@@ -215,7 +168,7 @@ class CellGraphWidget(QWidget):
 
         # get info about selected signals
         for i in range(self.btn_offset, self.layout().count()):
-            self.viewer.status = 'Selection changed1'
+            self.viewer.status = 'Selection changed'
             signal = self.layout().itemAt(i).itemAt(0).widget().currentText()
             signal_sel_list.append(signal)
             color = (
@@ -229,7 +182,7 @@ class CellGraphWidget(QWidget):
                 .name()
             )
             color_sel_list.append(color)
-        self.viewer.status = 'Selection changed3'
+        self.viewer.status = 'Selection changed'
         self.graph.signal_list = signal_sel_list
         self.graph.color_list = color_sel_list
 
@@ -238,14 +191,13 @@ class CellGraphWidget(QWidget):
         # update graph
         self.graph.update_graph_all()
 
-    def handleButtonClick(self, button):
-        if button.text() == '+':
-            self.addRowButton()
-            button.setText('-')
-        else:  # The button is a '-' button
-            self.removeRowButton(button)
+    def handleAddButtonClick(self, button):
 
-        self.onSelection()
+        self.addRowButton(button)
+
+    def handleMinButtonClick(self, button):
+
+        self.removeRowButton(button)
 
     def removeRowButton(self, button):
         # Find the layout that contains the button and remove it
@@ -256,6 +208,14 @@ class CellGraphWidget(QWidget):
                 self.clearLayout(layout.layout())
                 self.layout().removeItem(layout)
                 break
+
+        # if only one row left
+        if self.layout().count() == 2:
+            last_row = self.layout().itemAt(1)
+            last_row.itemAt(3).widget().setEnabled(False)
+
+        # update what is displayed
+        self.onSelection()
 
     def clearLayout(self, layout):
         if layout is not None:
@@ -277,6 +237,7 @@ class CellGraphWidget(QWidget):
             color_list=self.color_sel_list,
             tag_dictionary=self.tag_dictionary,
         )
+
         self.layout().addWidget(graph_widget)
 
         return graph_widget

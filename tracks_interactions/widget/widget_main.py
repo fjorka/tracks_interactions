@@ -1,9 +1,7 @@
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QGridLayout,
-    QScrollArea,
     QTabWidget,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -34,12 +32,8 @@ class TrackGardener(QWidget):
         self.modification_widget = None
 
         self.setStyleSheet(napari.qt.get_stylesheet(theme_id='dark'))
-        self.setLayout(QVBoxLayout())
+        self.setLayout(QGridLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
-
-        widget = QWidget()
-        widget.setLayout(QGridLayout())
-        widget.layout().setContentsMargins(0, 0, 0, 0)
 
         # QTabwidget
         self.tabwidget = QTabWidget()
@@ -48,7 +42,7 @@ class TrackGardener(QWidget):
         self.settings_window = SettingsWidget(
             viewer, self.create_widgets, self.clear_widgets
         )
-        self.tabwidget.addTab(self.settings_window, 'Settings')
+        self.tabwidget.addTab(self.settings_window, 'settings')
 
         # 2nd tab (initially empty)
         self.tab2 = QWidget()
@@ -56,17 +50,10 @@ class TrackGardener(QWidget):
         self.tab2.layout().setAlignment(Qt.AlignTop)
         self.tab2.layout().setContentsMargins(0, 0, 0, 0)
         self.tab2.setMinimumWidth(500)
-        self.tabwidget.addTab(self.tab2, 'Curating')
+        self.tabwidget.addTab(self.tab2, 'interact')
 
         # add tab widget to the layout
-        widget.layout().addWidget(self.tabwidget, 0, 0)
-
-        # Scrollarea allows content to be larger than the assigned space (small monitor)
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(widget)
-        scroll_area.setWidgetResizable(True)
-
-        self.layout().addWidget(scroll_area)
+        self.layout().addWidget(self.tabwidget, 0, 0)
 
     def clear_widgets(self):
         """
@@ -106,12 +93,16 @@ class TrackGardener(QWidget):
         ch_list,
         ch_names,
         ring_width,
+        signal_list,
         graph_list,
         cell_tags,
     ):
         """
         Callback to create widgets in the second tab.
         """
+
+        # remember general thing
+        self.cell_tags = cell_tags
 
         # add lineage graph
         fam_plot_widget = FamilyGraphWidget(self.viewer, session)
@@ -129,12 +120,11 @@ class TrackGardener(QWidget):
             ch_list=ch_list,
             ch_names=ch_names,
             ring_width=ring_width,
+            tag_dictionary=cell_tags,
         )
         self.tab2.layout().addWidget(self.modification_widget, 1, 0)
 
         # add graph widgets
-        # get this from the database
-        signal_list = ['area', 'ch0_nuc', 'ch0_cyto', 'ch1_nuc', 'ch1_cyto']
 
         for gr in graph_list:
             graph_name = gr.get('name', 'Unnamed')
@@ -151,7 +141,7 @@ class TrackGardener(QWidget):
             # self.tab2.layout().addWidget(graph_widget, ind, 0)
             # ind += 1
             self.viewer.window.add_dock_widget(
-                graph_widget, area='right', name=graph_name
+                graph_widget, area='bottom', name=graph_name
             )
             self.napari_widgets.append(graph_widget)
 
