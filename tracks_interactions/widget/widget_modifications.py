@@ -549,12 +549,14 @@ class ModificationWidget(QWidget):
 
             # save the note to the database
             active_label = int(self.labels.selected_label)
-            fdb.save_track_note(self.session,active_label,self.current_note)
+            sts = fdb.save_track_note(self.session,active_label,self.current_note)
 
             # adjust note icon
             self.update_note_and_icon()
 
             dialog.accept()
+
+            self.viewer.status = sts
         
         save_button.clicked.connect(save_note)
         dialog.exec_()
@@ -596,38 +598,15 @@ class ModificationWidget(QWidget):
         active_cell = self.labels.selected_label
         frame = self.viewer.dims.current_step[0]
 
-        cell_list = (
-            self.session.query(CellDB)
-            .filter(CellDB.t == frame)
-            .filter(CellDB.track_id == active_cell)
-            .all()
-        )
+        sts = fdb.tag_cell(self.session,active_cell,frame,annotation)
 
-        if len(cell_list) == 0:
-            self.viewer.status = 'Error - no cell found at this frame.'
-        elif len(cell_list) > 1:
-            self.viewer.status = (
-                f'Error - Multiple cells found for {active_cell} at {frame}.'
-            )
-        else:
-            cell = cell_list[0]
-            tags = cell.tags
+        # round trip to refresh the query and the viewer
+        sel_label = self.labels.selected_label
+        self.labels.selected_label = -1
+        self.labels.selected_label = sel_label
 
-            status = tags.get(annotation, False)
-
-            tags[annotation] = not status
-
-            cell.tags = tags
-            flag_modified(cell, 'tags')
-            self.session.commit()
-
-            # set status and update graph
-            self.viewer.status = f'Tag {annotation} was set to {not status}.'
-
-            # round trip to refresh the query and the viewer
-            sel_label = self.labels.selected_label
-            self.labels.selected_label = -1
-            self.labels.selected_label = sel_label
+        # update status
+        self.viewer.status = sts
 
     ################################################################################################
     ################################################################################################

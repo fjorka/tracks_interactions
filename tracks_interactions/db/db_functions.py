@@ -638,17 +638,54 @@ def get_track_note(session, active_label):
 
 
 def save_track_note(session,active_label,note):
+    """
+    Save a given note to the track in the database.
+    """
 
     track = session.query(TrackDB).filter_by(track_id=active_label).first()
 
     if track is None:
-        status = f'Error - track {active_label} is not present in the database.'
+        sts = f'Error - track {active_label} is not present in the database.'
 
     else:
         track.notes = note
         flag_modified(track, 'notes')
         session.commit()
 
-        status = f'Note for track {active_label} saved in the database.'
+        sts = f'Note for track {active_label} saved in the database.'
 
-    return status
+    return sts
+
+
+def tag_cell(session,active_cell,frame,annotation):
+    """
+    Function to give a tag to a cell in the CellDB table.
+    """
+
+    cell_list = (
+        session.query(CellDB)
+        .filter(CellDB.t == frame)
+        .filter(CellDB.track_id == active_cell)
+        .all()
+    )
+
+    if len(cell_list) == 0:
+        sts = 'Error - no cell found at this frame.'
+    elif len(cell_list) > 1:
+        sts = f'Error - Multiple cells found for {active_cell} at {frame}.'
+    else:
+        cell = cell_list[0]
+        tags = cell.tags
+
+        current_state = tags.get(annotation, False)
+
+        tags[annotation] = not current_state
+
+        cell.tags = tags
+        flag_modified(cell, 'tags')
+        session.commit()
+
+        # set status and update graph
+        sts = f'Tag {annotation} was set to {not current_state}.'
+
+    return sts
