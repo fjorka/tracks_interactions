@@ -5,6 +5,7 @@ import numpy as np
 from skimage.transform import resize
 from sqlalchemy import and_
 from sqlalchemy.orm import aliased
+from sqlalchemy.orm.attributes import flag_modified
 
 from tracks_interactions.db.db_model import CellDB, TrackDB
 
@@ -621,3 +622,33 @@ def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
         cell_dict[ch_name + '_cyto'] = ch_cyto
 
     return cell_dict
+
+
+def get_track_note(session, active_label):
+    """
+    Function to retrieve the free format note for a given track.
+    """
+
+    query = session.query(TrackDB).filter_by(track_id=active_label).first()
+
+    if query is None:
+        return None
+    else:
+       return query.notes 
+
+
+def save_track_note(session,active_label,note):
+
+    track = session.query(TrackDB).filter_by(track_id=active_label).first()
+
+    if track is None:
+        status = f'Error - track {active_label} is not present in the database.'
+
+    else:
+        track.notes = note
+        flag_modified(track, 'notes')
+        session.commit()
+
+        status = f'Note for track {active_label} saved in the database.'
+
+    return status

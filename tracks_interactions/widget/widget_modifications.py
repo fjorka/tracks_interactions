@@ -10,6 +10,8 @@ from qtpy.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QDialog,
+    QTextEdit
 )
 from skimage.measure import regionprops
 from sqlalchemy.orm.attributes import flag_modified
@@ -57,16 +59,16 @@ class ModificationWidget(QWidget):
         spacer_00.setFixedHeight(4)
         spacer_00.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout().addWidget(spacer_00)
-
+        
         # add tagging
         if len(self.tag_dictionary) > 0:
 
-            tag_widget = self.add_tag_buttons()
+            note_tag_widget = self.add_note_tag_buttons()
 
             tag_group = QGroupBox()
             tag_group.setLayout(QGridLayout())
             tag_group.layout().addWidget(QLabel('add tags:'))
-            tag_group.layout().addWidget(tag_widget)
+            tag_group.layout().addWidget(note_tag_widget)
             self.layout().addWidget(tag_group)
 
             self.add_tag_shortcuts()
@@ -75,6 +77,9 @@ class ModificationWidget(QWidget):
         spacer_01.setFixedHeight(4)
         spacer_01.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout().addWidget(spacer_01)
+
+        # connect change of cell to change of note
+        self.labels.events.selected_label.connect(self.update_note_and_icon)
 
         # add cell modification
         self.mod_cell_btn = self.add_mod_cell_btn()
@@ -495,11 +500,22 @@ class ModificationWidget(QWidget):
 
     ################################################################################################
     ################################################################################################
-    def add_tag_buttons(self):
+    def add_note_tag_buttons(self):
 
         tagWidget = QWidget()
         tagWidget.setLayout(QHBoxLayout())
 
+        # add a default note button 
+        self.note_btn = QPushButton('note')
+        self.note_btn.clicked.connect(self.add_note_function)
+
+        # add appropriate icon
+        self.update_note_and_icon()
+    
+        # add note button to the widget
+        tagWidget.layout().addWidget(self.note_btn)
+
+        # add tags according to the requst
         for tag in self.tag_dictionary:
             if tag != 'modified':
                 button = QPushButton(tag)
@@ -511,6 +527,52 @@ class ModificationWidget(QWidget):
                 tagWidget.layout().addWidget(button)
 
         return tagWidget
+    
+    def add_note_function(self):
+        """
+        Function to handle addition of a note to the track.
+        """
+
+        dialog = QDialog()
+        text_edit = QTextEdit()
+        text_edit.setText(self.current_note)
+        save_button = QPushButton("save note")
+        layout = QVBoxLayout()
+        layout.addWidget(text_edit)
+        layout.addWidget(save_button)
+        dialog.setLayout(layout)
+
+        def save_note():
+
+            # collect current note
+            self.current_note = text_edit.toPlainText()
+
+            # save the note to the database
+            active_label = int(self.labels.selected_label)
+            fdb.save_track_note(self.session,active_label,self.current_note)
+
+            # adjust note icon
+            self.update_note_and_icon()
+
+            dialog.accept()
+        
+        save_button.clicked.connect(save_note)
+        dialog.exec_()
+
+    def update_note_and_icon(self):
+        """
+        Function to update current note and button icon according to the selected label.
+        """
+        active_label = int(self.labels.selected_label)
+        self.current_note = fdb.get_track_note(self.session,active_label)
+
+        # change the icon accordigly
+        if bool(self.current_note):
+            icon = QIcon(r'../tracks_interactions/icons/icons8_note_full.png')
+        else:
+            icon = QIcon(r'../tracks_interactions/icons/icons8_note_empty.png')
+        self.note_btn.setIcon(icon)
+        self.note_btn.setText(None)
 
     def add_tag_shortcuts(self):
         """

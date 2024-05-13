@@ -40,18 +40,6 @@ class SignalGraph(GraphicsLayoutWidget):
         self.plot_view.setMouseEnabled(x=True, y=True)
         self.plot_view.setMenuEnabled(False)
 
-        # add note icon
-        self.note_icon_empty = QGraphicsPixmapItem(QPixmap(r'../tracks_interactions/icons/icons8_note_empty.png'))
-        self.note_icon_filled = QGraphicsPixmapItem(QPixmap(r'../tracks_interactions/icons/icons8_note_full.png'))
-        self.plot_view.addItem(self.note_icon_empty)
-        self.note_icon_empty.setVisible(True)
-        self.note_icon_filled.setVisible(False)
-        
-        self.current_note = ""
-        self.update_icon_position()
-        #self.plot_view.sigRangeChanged.connect(self.update_icon_position)
-
-
         # Connect the plotItem's mouse click event
         self.plot_view.scene().sigMouseClicked.connect(self.onMouseClick)
 
@@ -63,36 +51,6 @@ class SignalGraph(GraphicsLayoutWidget):
 
         # connect label selection event
         self.labels.events.selected_label.connect(self.update_graph_all)
-
-    def update_icon_position(self):
-        vb = self.plot_view.getViewBox()
-        rect = vb.viewRect()
-        self.note_icon_empty.setPos(rect.right() - 20, rect.top() + 20)
-        self.note_icon_filled.setPos(rect.right() - 20, rect.top() + 20)
-
-    def mousePressEvent(self, event):
-        if self.note_icon_empty.contains(event.pos()) or self.note_icon_filled.contains(event.pos()):
-            self.open_note_dialog()
-        super().mousePressEvent(event)
-
-    def open_note_dialog(self):
-        dialog = QDialog()
-        text_edit = QTextEdit()
-        text_edit.setText(self.current_note)
-        save_button = QPushButton("Save")
-        layout = QVBoxLayout()
-        layout.addWidget(text_edit)
-        layout.addWidget(save_button)
-        dialog.setLayout(layout)
-        
-        def save_note():
-            self.current_note = text_edit.toPlainText()
-            self.note_icon_empty.setVisible(not self.current_note)
-            self.note_icon_filled.setVisible(bool(self.current_note))
-            dialog.accept()
-        
-        save_button.clicked.connect(save_note)
-        dialog.exec_()
 
     def add_time_line(self):
         """
