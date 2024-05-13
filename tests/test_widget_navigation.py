@@ -171,3 +171,80 @@ def test_center_on_cell(qtbot, viewer, db_session):
     viewer.dims.set_point(0, 11)
     track_navigation_widget.follow_object_checkbox.setChecked(True)
     np.testing.assert_allclose(viewer.camera.center, (0.0, 5049.0, 4570.0))
+
+def test_center_on_cell_no_selection(qtbot, viewer, db_session):
+    """
+    Test that the viewer centers on cell when requested.
+    """
+
+    track_navigation_widget = TrackNavigationWidget(viewer, db_session)
+
+    qtbot.addWidget(track_navigation_widget)
+
+    # set viewer position to 10
+    viewer.dims.set_point(0, 10)
+
+    # select background
+    track_navigation_widget.labels.selected_label = 0
+    center_before = viewer.camera.center
+
+    # center
+    track_navigation_widget.center_object_function()
+    center_after = viewer.camera.center
+
+    # assert no movement
+    assert center_before == center_after, f'Expected camera position {center_before} but instead {center_after}.'
+
+
+def test_center_on_cell_beyond_track(qtbot, viewer, db_session):
+    """
+    Test that the viewer centers on cell when requested.
+    """
+
+    track_navigation_widget = TrackNavigationWidget(viewer, db_session)
+
+    qtbot.addWidget(track_navigation_widget)
+
+    # select background
+    track_navigation_widget.labels.selected_label = 37402
+
+    # set viewer position to 10
+    viewer.dims.set_point(0, 10)
+
+    # center
+    track_navigation_widget.center_object_function()
+
+    # assert change of the frame
+    assert viewer.dims.current_step[0] == 35
+    # assert proper position
+    np.testing.assert_allclose(viewer.camera.center, (0.0, 5120.0, 5344.0))
+
+    # set viewer position to 10
+    viewer.dims.set_point(0, 200)
+
+    # center
+    track_navigation_widget.center_object_function()
+
+    # assert change of the frame
+    assert viewer.dims.current_step[0] == 144
+    # assert proper position
+    np.testing.assert_allclose(viewer.camera.center, (0.0, 5158.0, 5143.0))
+
+
+def test_build_labels_too_many(qtbot, viewer, db_session):
+    """
+    Test situation with too many labels.
+    """
+
+    track_navigation_widget = TrackNavigationWidget(viewer, db_session)
+
+    qtbot.addWidget(track_navigation_widget)
+
+    # change query limit to low value
+    track_navigation_widget.query_lim = 2
+
+    # trigger update
+    viewer.dims.set_point(0, 110)
+
+    # ensure that labels are empty
+    assert np.max(viewer.layers['Labels'].data) == 0, f'Expected no labels, instead get max label {np.max(viewer.layers["Labels"].data)}'

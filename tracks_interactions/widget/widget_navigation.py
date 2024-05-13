@@ -180,39 +180,34 @@ class TrackNavigationWidget(QWidget):
         )  # because numpy.int64 is not accepted by the database
         current_frame = self.viewer.dims.current_step[0]
 
-        if track_id != 0:
-            # find the object
-            cell = (
-                self.session.query(CellDB)
-                .filter(
-                    and_(
-                        CellDB.track_id == track_id, CellDB.t == current_frame
-                    )
+        # find the object
+        cell = (
+            self.session.query(CellDB)
+            .filter(
+                and_(
+                    CellDB.track_id == track_id, CellDB.t == current_frame
                 )
-                .first()
             )
+            .first()
+        )
 
-            if cell is not None:
-                # get the position
-                r = cell.row
-                c = cell.col
+        if cell is not None:
+            # get the position
+            r = cell.row
+            c = cell.col
 
-                # check if there is movement
-                _, x, y = self.viewer.camera.center
+            # check if there is movement
+            _, x, y = self.viewer.camera.center
 
-                if x == r and y == c:
-                    # trigger rebuilding of labels
-                    self.build_labels()
-                else:
-                    # move the camera
-                    self.viewer.camera.center = (0, r, c)
-
-            else:
-                self.viewer.status = 'No object in this frame.'
+            if x == r and y == c:
+                # trigger rebuilding of labels
                 self.build_labels()
+            else:
+                # move the camera
+                self.viewer.camera.center = (0, r, c)
 
         else:
-            self.viewer.status = 'No object selected.'
+            self.viewer.status = 'No object in this frame.'
             self.build_labels()
 
     def center_object_function(self):
@@ -224,19 +219,26 @@ class TrackNavigationWidget(QWidget):
         curr_tr = int(
             self.labels.selected_label
         )  # because numpy.int64 is not accepted by the database
-        curr_fr = self.viewer.dims.current_step[0]
 
-        # find the pathway
-        tr = self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
+        if curr_tr != 0:
 
-        # move time point if beyond boundary
-        if tr.t_begin > curr_fr:
-            self.viewer.dims.set_point(0, tr.t_begin)
-        elif tr.t_end < curr_fr:
-            self.viewer.dims.set_point(0, tr.t_end)
+            curr_fr = self.viewer.dims.current_step[0]
 
-        # center the cell
-        self.center_object_core_function()
+            # find the pathway
+            tr = self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
+
+            # move time point if beyond boundary
+            if tr.t_begin > curr_fr:
+                self.viewer.dims.set_point(0, tr.t_begin)
+            elif tr.t_end < curr_fr:
+                self.viewer.dims.set_point(0, tr.t_end)
+
+            # center the cell
+            self.center_object_core_function()
+
+        else:
+            self.viewer.status = 'No object selected.'
+            self.build_labels()
 
     def add_start_track_btn(self):
         """
