@@ -5,6 +5,11 @@ import pytest
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
+from qtpy.QtWidgets import QPushButton, QDialog
+from qtpy.QtCore import Qt
+from qtpy.QtTest import QTest
+from unittest.mock import MagicMock, patch
+
 from tracks_interactions.db.db_model import CellDB, TrackDB
 from tracks_interactions.widget.widget_modifications import ModificationWidget
 
@@ -110,11 +115,346 @@ def test_adding_new_track(qtbot, viewer, db_session):
 
     assert modification_widget.labels.selected_label == 37404, f'Expected selected label to be 37404, instead it is {modification_widget.labels.selected_label}.'
 
-def test_mod_cell_function(qtbot, viewer, db_session):
+def test_cut_cell_function(qtbot, viewer, db_session):
+    """
+    Test function to cut a cell - true cut.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    modification_widget.labels.selected_label = 20422
+    viewer.dims.set_point(0, 20)
+
+    modification_widget.cut_track_function()
+
+    # check that the new selected label is a new track
+    assert modification_widget.labels.selected_label == 37404, f'Expected selected track to be a new track - 37404, instead it is {modification_widget.labels.selected_label}.'
+
+def test_cut_cell_function_mitosis(qtbot, viewer, db_session):
+    """
+    Test function to cut a cell from mitosis.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    starting_track = 37402
+    modification_widget.labels.selected_label = starting_track
+    viewer.dims.set_point(0, 35)
+
+    modification_widget.cut_track_function()
+
+    # check that the new selected label is a new track
+    assert modification_widget.labels.selected_label == 37402, f'Expected selected track to be {starting_track}, instead it is {modification_widget.labels.selected_label}.'
+
+def test_del_cell_function(qtbot, viewer, db_session):
+    """
+    Test function to delete an entire track.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    starting_track = 37402
+    modification_widget.labels.selected_label = starting_track
+
+    modification_widget.del_track_function()
+
+    # check that the new selected label is zero, because the track was deleted
+    assert modification_widget.labels.selected_label == 0, f'Expected selected track to be 0, instead it is {modification_widget.labels.selected_label}.'
+
+def test_del_cell_function_no_cell(qtbot, viewer, db_session):
+    """
+    Test function to delete an entire track, not found.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+
+    starting_track = 37402
+    modification_widget.labels.selected_label = starting_track
+    no_track = 333
+    modification_widget.labels.selected_label = no_track
+
+    modification_widget.del_track_function()
+
+    # check that the new selected label is a new track
+    assert modification_widget.labels.selected_label == no_track, f'Expected selected track to be {starting_track}, instead it is {modification_widget.labels.selected_label}.'
+    exp_status = 'Track not found'
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+def test_merge_cell_function(qtbot, viewer, db_session):
+    """
+    Test function to merge two tracks.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+
+    previous_track = 37402
+    active_track = 20428
+    viewer.dims.set_point(0, 130)
+
+    # populate T1 and T2 spinboxes by selection
+    modification_widget.labels.selected_label = previous_track
+    modification_widget.labels.selected_label = active_track
+
+    # merge tracks
+    modification_widget.merge_track_function()
+
+    # check that the new selected label is a new track
+    assert modification_widget.labels.selected_label == previous_track, f'Expected selected track to be {previous_track}, instead it is {modification_widget.labels.selected_label}.'
+
+def test_merge_cell_function_too_early(qtbot, viewer, db_session):
+    """
+    Test function to merge two tracks.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+
+    previous_track = 20428
+    active_track = 37402
+    viewer.dims.set_point(0, 70)
+
+    # populate T1 and T2 spinboxes by selection
+    modification_widget.labels.selected_label = previous_track
+    modification_widget.labels.selected_label = active_track
+
+    # merge tracks
+    modification_widget.merge_track_function()
+
+    exp_status = "Error - cannot merge to a track that hasn't started yet."
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+def test_merge_cell_function_same_cell(qtbot, viewer, db_session):
+    """
+    Test function to merge two tracks.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+    modification_widget.T2_box.setValue(37402)
+    modification_widget.T1_box.setValue(37402)
+
+    viewer.dims.set_point(0, 130)
+
+    # merge tracks
+    modification_widget.merge_track_function()
+
+    exp_status = 'Error - cannot merge a track with itself.'
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+def test_connect_cell_function(qtbot, viewer, db_session):
+    """
+    Test function to connect two tracks.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+
+    previous_track = 37402
+    active_track = 20428
+    viewer.dims.set_point(0, 130)
+
+    # populate T1 and T2 spinboxes by selection
+    modification_widget.labels.selected_label = previous_track
+    modification_widget.labels.selected_label = active_track
+
+    # merge tracks
+    modification_widget.connect_track_function()
+
+    # check that the new selected label is a new track
+    assert modification_widget.labels.selected_label == active_track, f'Expected selected track to be {active_track}, instead it is {modification_widget.labels.selected_label}.'
+
+def test_connect_cell_function_same_cell(qtbot, viewer, db_session):
+    """
+    Test function to connect two tracks when requested for the same tracks.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+    modification_widget.T2_box.setValue(37402)
+    modification_widget.T1_box.setValue(37402)
+
+    viewer.dims.set_point(0, 130)
+
+    # merge tracks
+    modification_widget.connect_track_function()
+
+    exp_status = 'Error - cannot connect a track with itself.' 
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+def test_connect_cell_function_too_early(qtbot, viewer, db_session):
+    """
+    Test function to connect two tracks when the receiver track didn't start yet.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+
+    previous_track = 20428
+    active_track = 37402
+    viewer.dims.set_point(0, 70)
+
+    # populate T1 and T2 spinboxes by selection
+    modification_widget.labels.selected_label = previous_track
+    modification_widget.labels.selected_label = active_track
+
+    # merge tracks
+    modification_widget.connect_track_function()
+
+    exp_status = "Error - cannot connect to a track that hasn't started yet." 
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+def test_add_note_to_track(qtbot, viewer, db_session):
+    """
+    Test function to add a free format note to a track.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    # Call the function to test
+    tag_widget = modification_widget.add_note_tag_buttons()
+    
+    # Verify that the note button is added even when tags are not present
+    # note button doesn't have text, just icon
+    assert len(tag_widget.findChildren(QPushButton)) == 1, f'Expected a single a button to be found, but instead {len(tag_widget.findChildren(QPushButton))} buttons found.'
+
+    btn = tag_widget.findChildren(QPushButton)[0]
+
+    original_exec = QDialog.exec_
+    QDialog.exec_ = MagicMock(return_value=1)  # Assuming 1 is the 'accepted' return value
+    
+    # Use QTest to click the button, it does not require the window to be visible
+    QTest.mouseClick(btn, Qt.LeftButton)
+
+    # Check that the exec was called, indicating the dialog was 'opened'
+    assert QDialog.exec_.called, "The dialog's exec_ method should have been called."
+
+    # Restore the original method after the test to avoid side effects
+    QDialog.exec_ = original_exec
+
+def test_save_note(viewer, db_session):
+    """
+    Test function to add a free format note to a track.
+    Only the behaviour of the interface. 
+    Database modifications are tested separately.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    my_note = 'test'
+    mock_event = MagicMock()
+    mock_event.toPlainText.return_value = my_note
+    modification_widget.text_edit = mock_event
+    mock_dialog = MagicMock()
+    modification_widget.dialog = mock_dialog
+    active_label = 20422
+    modification_widget.labels.selected_label = active_label
+
+    # Call the method
+    modification_widget.save_note()
+
+    exp_status = f'Note for track {active_label} saved in the database.'
+    assert viewer.status == exp_status, f'Expected status of the viewer to be {exp_status}, instead it is {viewer.status}'
+
+    assert modification_widget.current_note == my_note, f'Expected current.note to be {my_note}, instead it is {modification_widget.current_note}'
+
+
+def test_mod_cell_function_deletion(viewer, db_session,mocker):
     """
     Test saving modifications of a cell object to a database.
     """
 
     modification_widget = ModificationWidget(viewer, db_session)
 
-    modification_widget.
+    # labels are not really build unless navigation widget is built
+    cell_id = '20422'
+    viewer.dims.set_point(0, 0)
+    
+    mock_cell = MagicMock()
+    mock_cell.track_id = cell_id
+    modification_widget.labels.metadata['query'] = [mock_cell]
+
+    mock_remove_db = mocker.patch('tracks_interactions.widget.widget_modifications.fdb.remove_CellDB')
+
+    modification_widget.mod_cell_function()
+    
+    assert mock_remove_db.called, "remove_CellDB should have been called"
+
+
+def test_mod_cell_function_addition(viewer, db_session,mocker):
+    """
+    Test saving modifications of a cell object to a database.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    # set position
+    viewer.dims.set_point(0, 0)
+
+    # change labels
+    modification_widget.labels.data[0:2,0:2] = 5
+
+    # mock the query remembered by labels
+    modification_widget.labels.metadata['query'] = []
+
+    mock_func_db = mocker.patch('tracks_interactions.widget.widget_modifications.fdb.add_new_CellDB')
+
+    modification_widget.mod_cell_function()
+    
+    assert mock_func_db.called, "add_new_CellDB should have been called"
+
+def test_mod_cell_function_modification(viewer, db_session,mocker):
+    """
+    Test saving modifications of a cell object to a database.
+    """
+
+    modification_widget = ModificationWidget(viewer, db_session)
+
+    # set position
+    viewer.dims.set_point(0, 0)
+
+    # change labels
+    modification_widget.labels.data[0:2,0:2] = 2
+
+    # mock the query remembered by labels
+    cell_id = 2
+    pos = 100
+    viewer.dims.set_point(0, 0)
+    
+    mock_cell = MagicMock()
+    mock_cell.track_id = cell_id
+    mock_cell.row = pos
+    mock_cell.col = pos
+    modification_widget.labels.metadata['query'] = [mock_cell]
+
+    mock_func_db = mocker.patch('tracks_interactions.widget.widget_modifications.fdb.add_new_CellDB')
+    mock_remove_db = mocker.patch('tracks_interactions.widget.widget_modifications.fdb.remove_CellDB')
+
+    modification_widget.mod_cell_function()
+    
+    assert mock_remove_db.called, "remove_CellDB should have been called"
+    assert mock_func_db.called, "add_new_CellDB should have been called"
+
+    exp_status = f'2 has been modified' 
+    assert viewer.status == exp_status, f'Expected status of the viewer to be "{exp_status}", instead it is "{viewer.status}"'

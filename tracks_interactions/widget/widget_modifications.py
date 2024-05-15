@@ -60,18 +60,17 @@ class ModificationWidget(QWidget):
         spacer_00.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout().addWidget(spacer_00)
         
-        # add tagging
-        if len(self.tag_dictionary) > 0:
+        # add notes and tagging
 
-            note_tag_widget = self.add_note_tag_buttons()
+        self.note_tag_widget = self.add_note_tag_buttons()
 
-            tag_group = QGroupBox()
-            tag_group.setLayout(QGridLayout())
-            tag_group.layout().addWidget(QLabel('add tags:'))
-            tag_group.layout().addWidget(note_tag_widget)
-            self.layout().addWidget(tag_group)
+        tag_group = QGroupBox()
+        tag_group.setLayout(QGridLayout())
+        tag_group.layout().addWidget(QLabel('notes and tags:'))
+        tag_group.layout().addWidget(self.note_tag_widget)
+        self.layout().addWidget(tag_group)
 
-            self.add_tag_shortcuts()
+        self.add_tag_shortcuts()
 
         spacer_01 = QWidget()
         spacer_01.setFixedHeight(4)
@@ -528,38 +527,39 @@ class ModificationWidget(QWidget):
 
         return tagWidget
     
+    def save_note(self):
+
+        # collect current note
+        self.current_note = self.text_edit.toPlainText()
+
+        # save the note to the database
+        active_label = int(self.labels.selected_label)
+        sts = fdb.save_track_note(self.session,active_label,self.current_note)
+
+        # adjust note icon
+        self.update_note_and_icon()
+
+        self.dialog.accept()
+
+        self.viewer.status = sts
+
+
     def add_note_function(self):
         """
         Function to handle addition of a note to the track.
         """
 
-        dialog = QDialog()
-        text_edit = QTextEdit()
-        text_edit.setText(self.current_note)
+        self.dialog = QDialog()
+        self.text_edit = QTextEdit()
+        self.text_edit.setText(self.current_note)
         save_button = QPushButton("save note")
         layout = QVBoxLayout()
-        layout.addWidget(text_edit)
+        layout.addWidget(self.text_edit)
         layout.addWidget(save_button)
-        dialog.setLayout(layout)
+        self.dialog.setLayout(layout)
 
-        def save_note():
-
-            # collect current note
-            self.current_note = text_edit.toPlainText()
-
-            # save the note to the database
-            active_label = int(self.labels.selected_label)
-            sts = fdb.save_track_note(self.session,active_label,self.current_note)
-
-            # adjust note icon
-            self.update_note_and_icon()
-
-            dialog.accept()
-
-            self.viewer.status = sts
-        
-        save_button.clicked.connect(save_note)
-        dialog.exec_()
+        save_button.clicked.connect(self.save_note)
+        self.dialog.exec_()
 
     def update_note_and_icon(self):
         """

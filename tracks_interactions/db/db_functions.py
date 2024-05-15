@@ -295,7 +295,7 @@ def integrate_trackDB(session, operation, t1_ind, t2_ind, current_frame):
 
     # if t1 doesn't start yet
     if t1.t_begin >= current_frame:
-        return -1
+        return -1, None
 
     # if t1 is to be cut
     if (t1.t_begin < current_frame) and (t1.t_end >= current_frame):
