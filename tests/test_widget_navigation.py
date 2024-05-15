@@ -172,6 +172,7 @@ def test_center_on_cell(qtbot, viewer, db_session):
     track_navigation_widget.follow_object_checkbox.setChecked(True)
     np.testing.assert_allclose(viewer.camera.center, (0.0, 5049.0, 4570.0))
 
+
 def test_center_on_cell_no_selection(qtbot, viewer, db_session):
     """
     Test that the viewer centers on cell when requested.
@@ -193,7 +194,9 @@ def test_center_on_cell_no_selection(qtbot, viewer, db_session):
     center_after = viewer.camera.center
 
     # assert no movement
-    assert center_before == center_after, f'Expected camera position {center_before} but instead {center_after}.'
+    assert (
+        center_before == center_after
+    ), f'Expected camera position {center_before} but instead {center_after}.'
 
 
 def test_center_on_cell_beyond_track(qtbot, viewer, db_session):
@@ -247,4 +250,6 @@ def test_build_labels_too_many(qtbot, viewer, db_session):
     viewer.dims.set_point(0, 110)
 
     # ensure that labels are empty
-    assert np.max(viewer.layers['Labels'].data) == 0, f'Expected no labels, instead get max label {np.max(viewer.layers["Labels"].data)}'
+    assert (
+        np.max(viewer.layers['Labels'].data) == 0
+    ), f'Expected no labels, instead get max label {np.max(viewer.layers["Labels"].data)}'

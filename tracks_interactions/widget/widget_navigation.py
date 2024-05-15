@@ -184,9 +184,7 @@ class TrackNavigationWidget(QWidget):
         cell = (
             self.session.query(CellDB)
             .filter(
-                and_(
-                    CellDB.track_id == track_id, CellDB.t == current_frame
-                )
+                and_(CellDB.track_id == track_id, CellDB.t == current_frame)
             )
             .first()
         )
@@ -225,7 +223,9 @@ class TrackNavigationWidget(QWidget):
             curr_fr = self.viewer.dims.current_step[0]
 
             # find the pathway
-            tr = self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
+            tr = (
+                self.session.query(TrackDB).filter_by(track_id=curr_tr).first()
+            )
 
             # move time point if beyond boundary
             if tr.t_begin > curr_fr:

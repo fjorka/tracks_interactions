@@ -1,8 +1,6 @@
 import numpy as np
 from pyqtgraph import GraphicsLayoutWidget, LegendItem, TextItem, mkPen
 from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QGraphicsPixmapItem, QDialog, QTextEdit, QVBoxLayout, QPushButton
-from qtpy.QtGui import QPixmap
 
 from tracks_interactions.db.db_model import CellDB
 

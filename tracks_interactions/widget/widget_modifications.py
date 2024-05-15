@@ -1,6 +1,7 @@
 import numpy as np
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
+    QDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -8,16 +9,13 @@ from qtpy.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpinBox,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
-    QDialog,
-    QTextEdit
 )
 from skimage.measure import regionprops
-from sqlalchemy.orm.attributes import flag_modified
 
 import tracks_interactions.db.db_functions as fdb
-from tracks_interactions.db.db_model import CellDB
 
 
 class ModificationWidget(QWidget):
@@ -59,7 +57,7 @@ class ModificationWidget(QWidget):
         spacer_00.setFixedHeight(4)
         spacer_00.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout().addWidget(spacer_00)
-        
+
         # add notes and tagging
 
         self.note_tag_widget = self.add_note_tag_buttons()
@@ -504,13 +502,13 @@ class ModificationWidget(QWidget):
         tagWidget = QWidget()
         tagWidget.setLayout(QHBoxLayout())
 
-        # add a default note button 
+        # add a default note button
         self.note_btn = QPushButton('note')
         self.note_btn.clicked.connect(self.add_note_function)
 
         # add appropriate icon
         self.update_note_and_icon()
-    
+
         # add note button to the widget
         tagWidget.layout().addWidget(self.note_btn)
 
@@ -526,7 +524,7 @@ class ModificationWidget(QWidget):
                 tagWidget.layout().addWidget(button)
 
         return tagWidget
-    
+
     def save_note(self):
 
         # collect current note
@@ -534,7 +532,9 @@ class ModificationWidget(QWidget):
 
         # save the note to the database
         active_label = int(self.labels.selected_label)
-        sts = fdb.save_track_note(self.session,active_label,self.current_note)
+        sts = fdb.save_track_note(
+            self.session, active_label, self.current_note
+        )
 
         # adjust note icon
         self.update_note_and_icon()
@@ -542,7 +542,6 @@ class ModificationWidget(QWidget):
         self.dialog.accept()
 
         self.viewer.status = sts
-
 
     def add_note_function(self):
         """
@@ -552,7 +551,7 @@ class ModificationWidget(QWidget):
         self.dialog = QDialog()
         self.text_edit = QTextEdit()
         self.text_edit.setText(self.current_note)
-        save_button = QPushButton("save note")
+        save_button = QPushButton('save note')
         layout = QVBoxLayout()
         layout.addWidget(self.text_edit)
         layout.addWidget(save_button)
@@ -566,7 +565,7 @@ class ModificationWidget(QWidget):
         Function to update current note and button icon according to the selected label.
         """
         active_label = int(self.labels.selected_label)
-        self.current_note = fdb.get_track_note(self.session,active_label)
+        self.current_note = fdb.get_track_note(self.session, active_label)
 
         # change the icon accordigly
         if bool(self.current_note):
@@ -598,7 +597,7 @@ class ModificationWidget(QWidget):
         active_cell = self.labels.selected_label
         frame = self.viewer.dims.current_step[0]
 
-        sts = fdb.tag_cell(self.session,active_cell,frame,annotation)
+        sts = fdb.tag_cell(self.session, active_cell, frame, annotation)
 
         # round trip to refresh the query and the viewer
         sel_label = self.labels.selected_label

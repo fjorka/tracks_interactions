@@ -633,11 +633,11 @@ def get_track_note(session, active_label):
 
     if query is None:
         return None
-    else:
-       return query.notes 
+
+    return query.notes
 
 
-def save_track_note(session,active_label,note):
+def save_track_note(session, active_label, note):
     """
     Save a given note to the track in the database.
     """
@@ -657,7 +657,7 @@ def save_track_note(session,active_label,note):
     return sts
 
 
-def tag_cell(session,active_cell,frame,annotation):
+def tag_cell(session, active_cell, frame, annotation):
     """
     Function to give a tag to a cell in the CellDB table.
     """
