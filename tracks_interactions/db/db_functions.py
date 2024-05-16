@@ -31,6 +31,16 @@ def newTrack_number(session):
     return query[0] + 1
 
 
+def get_signals(session):
+    """
+    Function to get signal names from the database.
+    """
+    example_cell = session.query(CellDB).first()
+    signal_list = list(example_cell.signals.keys())
+
+    return signal_list
+
+
 def get_descendants(session, active_label):
     """
     Function to recursively get all descendants of a given label.

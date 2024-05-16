@@ -1,0 +1,26 @@
+experiment_settings:
+  experiment_name: Test experiment
+  description: Test description of an experiment
+
+signal_channels:
+  - name: ch0
+    path: test.zarr
+    lut: green
+    contrast_limits: [0, 4095]
+
+labels_settings:
+  brush_size: 20
+
+database:
+  path: db_2tables_test.db
+
+graphs:
+  - name: area
+    signals:
+      - area
+    colors:
+      - white
+
+cell_tags:
+  modified: x
+  test: T

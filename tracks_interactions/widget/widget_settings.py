@@ -17,6 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import napari
+import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.widget.signal_graph_widget import CellGraphWidget
 
 
@@ -126,11 +127,11 @@ class SettingsWidget(QWidget):
         self.loadTracking()
 
         # display load experiment button
-        pb = QPushButton('Save Settings')
+        # pb = QPushButton('Save Settings')
         # pb.clicked.connect(self.loadExperiment)
-        self.mWidget.layout().addWidget(pb, self.widget_line, 0)
-        self.added_widgets.append(pb)
-        self.widget_line += 1
+        # self.mWidget.layout().addWidget(pb, self.widget_line, 0)
+        # self.added_widgets.append(pb)
+        # self.widget_line += 1
 
         # display load widgets button
         pb = QPushButton('Add graph')
@@ -140,22 +141,22 @@ class SettingsWidget(QWidget):
         self.widget_line += 1
 
     def loadConfigFile(self, filePath):
+        """
+        Put the content of the yaml file into internal variables.
+        """
 
         with open(filePath) as file:
             config = yaml.safe_load(file)
 
+            self.experiment_name = config.get('experiment_name', 'Unnamed')
+            self.experiment_description = config.get(
+                'experiment_description', ''
+            )
             self.database_path = config.get('database', {}).get('path', '')
             self.channels_list = config.get('signal_channels', [])
+            self.labels_settings = config.get('labels_settings', {})
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
-            # get this from the database
-            self.signal_list = [
-                'area',
-                'ch0_nuc',
-                'ch0_cyto',
-                'ch1_nuc',
-                'ch1_cyto',
-            ]
 
     def loadExperiment(self):
         """
@@ -179,6 +180,7 @@ class SettingsWidget(QWidget):
             channel_name = ch.get('name', 'Unnamed')
             channel_path = ch.get('path', '')
             channel_lut = ch.get('lut', 'green')
+            channel_contrast_limits = ch.get('contrast_limits', [0, 4095])
 
             ch_list = []
             for level in range(1, 5):
@@ -191,16 +193,20 @@ class SettingsWidget(QWidget):
                 name=channel_name,
                 colormap=channel_lut,
                 blending='additive',
-                contrast_limits=[0, 2048],
+                contrast_limits=channel_contrast_limits,
             )
 
         # create empty labels and add to the viewer
         empty_labels = np.zeros(
             [ch_list[0].shape[1], ch_list[0].shape[2]]
         ).astype(int)
-        self.viewer.add_labels(
+        labels_layer = self.viewer.add_labels(
             empty_labels, name='Labels', metadata={'persistent_label': -1}
         )
+        labels_layer.brush_size = self.labels_settings['brush_size']
+
+        # set no selection to start
+        labels_layer.selected_label = 0
 
         self.viewer.status = 'Experiment loaded'
 
@@ -212,6 +218,9 @@ class SettingsWidget(QWidget):
         # establish connection to the database
         engine = create_engine(f'sqlite:///{self.database_path}')
         self.session = sessionmaker(bind=engine)()
+
+        # get a list of signals
+        self.signal_list = fdb.get_signals(self.session)
 
         # Trigger populating of tab2 in the main widget with tracking widgets
         ch_names = [ch.get('name', 'Unnamed') for ch in self.channels_list]
