@@ -26,7 +26,7 @@ def newTrack_number(session):
     )
 
     if query is None:
-        return 0
+        return 1
 
     return query[0] + 1
 

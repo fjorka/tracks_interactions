@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.orm import make_transient, sessionmaker
 
+import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.db.db_functions import (
     add_new_core_CellDB,
     cellsDB_after_trackDB,
@@ -107,6 +108,19 @@ def test_starting_db(db_session):
     assert db_session.query(TrackDB).filter_by(track_id=37401).one()
 
 
+def test_getting_signals(db_session):
+    """
+    Test getting the list of signal names from the database.
+    """
+    expected_list = ['area', 'ch0_nuc', 'ch0_cyto', 'ch1_nuc', 'ch1_cyto']
+
+    signal_list = fdb.get_signals(db_session)
+
+    assert (
+        signal_list == expected_list
+    ), f'Expected {expected_list}, got {signal_list}'
+
+
 def test_adding_track(db_session):
     """Test - add a new track"""
     new_track = TrackDB(
@@ -171,6 +185,25 @@ def test_newTrack_number(db_session):
 
     new_track = newTrack_number(db_session)
     assert new_track == new_track_number + 1
+
+
+def test_newTrack_number_empty_db(db_session):
+    """Test - getting a new track number
+    while the database is empty"""
+
+    # clear the database
+    query = db_session.query(TrackDB).all()
+    ids_list = [x.track_id for x in query]
+    for run_id in ids_list:
+        _ = delete_trackDB(db_session, run_id)
+
+    # check that it's empty
+    query = db_session.query(TrackDB).all()
+    assert len(query) == 0, f'Expected database to be empty, got {len(query)}'
+
+    # asssert the correct new track number
+    new_track = newTrack_number(db_session)
+    assert new_track == 1, f'Expected 1, got {new_track}'
 
 
 def test_get_descendants(db_session):
@@ -448,6 +481,27 @@ def test_cut_merge_trackDB(db_session):
         .parent_track_id
         == 20423
     )
+
+
+def test_cellsDB_after_trackDB_nonsense_call(db_session):
+    """Test nonsense call response"""
+
+    active_label = 20422
+
+    current_frame = 3
+    new_track = 100
+
+    with pytest.raises(ValueError) as exc_info:
+        _ = cellsDB_after_trackDB(
+            db_session,
+            active_label,
+            current_frame,
+            new_track,
+            direction='left',
+        )
+
+    exp_status = "Direction should be 'all', 'before' or 'after'."
+    assert str(exc_info.value) == exp_status
 
 
 def test_cellsDB_after_trackDB(db_session):
@@ -1089,3 +1143,83 @@ def test_remove_cell_cut_track(db_session):
 
     t = db_session.query(TrackDB).filter_by(track_id=new_track).one()
     assert t.t_begin == current_frame
+
+
+def test_add_note_no_track(db_session):
+    """
+    Test adding a note to a non-existing track.
+    """
+
+    active_label = 20
+    note = 'This is a note. No kidding.'
+
+    sts = fdb.save_track_note(db_session, active_label, note)
+
+    exp_status = (
+        f'Error - track {active_label} is not present in the database.'
+    )
+    assert (
+        sts == exp_status
+    ), f'Expected status of the viewer to be {exp_status}, instead it is {sts}'
+
+
+def test_get_note_no_track(db_session):
+    """
+    Test adding a note to a non-existing track.
+    """
+
+    active_label = 20
+
+    sts = fdb.get_track_note(db_session, active_label)
+
+    assert sts is None, f'Expected return to be None, instead it is {sts}'
+
+
+def test_add_retrieve_track_note(db_session):
+    """
+    Test adding and retrieving a note for a track.
+    """
+
+    active_label = 20422
+    note = 'This is a note. No kidding.'
+
+    sts = fdb.save_track_note(db_session, active_label, note)
+
+    exp_status = f'Note for track {active_label} saved in the database.'
+    assert (
+        sts == exp_status
+    ), f'Expected status to be {exp_status}, instead it is {sts}'
+
+    new_note = fdb.get_track_note(db_session, active_label)
+
+    assert new_note == note, f'Expected {note}, got {new_note}'
+
+
+def test_add_tags(db_session):
+    """
+    Test adding and retrieving a note for a track.
+    """
+
+    active_cell = 20422
+    frame = 20
+    annotation = 'apoptosis'
+
+    cell_list = (
+        db_session.query(CellDB)
+        .filter(CellDB.t == frame)
+        .filter(CellDB.track_id == active_cell)
+        .first()
+    )
+
+    assert cell_list.tags == {}, f'Expected no tag, got {cell_list.tags}'
+
+    _ = fdb.tag_cell(db_session, active_cell, frame, annotation)
+
+    cell_list = (
+        db_session.query(CellDB)
+        .filter(CellDB.t == frame)
+        .filter(CellDB.track_id == active_cell)
+        .first()
+    )
+
+    assert cell_list.tags['apoptosis'], f'Expected True, got {cell_list.tags}'

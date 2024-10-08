@@ -1,6 +1,7 @@
 import dask.array as da
 import numpy as np
 import yaml
+import zarr
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QPixmap
@@ -148,8 +149,11 @@ class SettingsWidget(QWidget):
         with open(filePath) as file:
             config = yaml.safe_load(file)
 
-            self.experiment_name = config.get('experiment_name', 'Unnamed')
-            self.experiment_description = config.get(
+            exp_settings = config.get('experiment_settings', {})
+            self.experiment_name = exp_settings.get(
+                'experiment_name', 'Unnamed'
+            )
+            self.experiment_description = exp_settings.get(
                 'experiment_description', ''
             )
             self.database_path = config.get('database', {}).get('path', '')
@@ -157,6 +161,26 @@ class SettingsWidget(QWidget):
             self.labels_settings = config.get('labels_settings', {})
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
+
+    def load_zarr(self, channel_path):
+        """
+        Function to load data from zarr.
+        """
+
+        # try loading if it's a single level
+        try:
+            data = [da.from_zarr(channel_path)]
+
+        except zarr.errors.ContainsGroupError:
+
+            # check number of levels
+            root_group = zarr.open_group(channel_path, mode='r')
+            levels_list = [key for key in root_group if key.isdigit()]
+            data = []
+            for level in levels_list:
+                data.append(da.from_zarr(channel_path, level))
+
+        return data
 
     def loadExperiment(self):
         """
@@ -179,35 +203,45 @@ class SettingsWidget(QWidget):
         for ch in self.channels_list:
             channel_name = ch.get('name', 'Unnamed')
             channel_path = ch.get('path', '')
+            if '.zarr' not in channel_path:
+                self.viewer.status = 'Only zarr files are supported'
+                return
             channel_lut = ch.get('lut', 'green')
             channel_contrast_limits = ch.get('contrast_limits', [0, 4095])
 
-            ch_list = []
-            for level in range(1, 5):
-                ch_list.append(da.from_zarr(channel_path, level))
+            # get data from zarr
+            # a list of arrays
+            # multiple arrays if multiscale
+            data = self.load_zarr(channel_path)
 
-            self.channels_data_list.append(ch_list[0])
+            # necessary to send to the modification widget
+            # to recalculate signals when object changes
+            self.channels_data_list.append(data[0])
+
+            # because napari cannot accept a single array within a list
+            data_viewer = data[0] if len(data) == 1 else data
 
             self.viewer.add_image(
-                ch_list,
+                data_viewer,
                 name=channel_name,
                 colormap=channel_lut,
                 blending='additive',
                 contrast_limits=channel_contrast_limits,
             )
 
-        # create empty labels and add to the viewer
-        empty_labels = np.zeros(
-            [ch_list[0].shape[1], ch_list[0].shape[2]]
-        ).astype(int)
+        # add labels to the viewer
+        empty_labels = np.zeros([data[0].shape[1], data[0].shape[2]]).astype(
+            int
+        )
         labels_layer = self.viewer.add_labels(
             empty_labels, name='Labels', metadata={'persistent_label': -1}
         )
-        labels_layer.brush_size = self.labels_settings['brush_size']
 
-        # set no selection to start
+        # set labels settings
         labels_layer.selected_label = 0
+        labels_layer.brush_size = self.labels_settings.get('brush_size', 10)
 
+        # set viewer status
         self.viewer.status = 'Experiment loaded'
 
     def loadTracking(self):
