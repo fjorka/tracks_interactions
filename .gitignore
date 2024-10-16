@@ -85,3 +85,4 @@ venv/
 **/_version.py
 examples/metadata.toml
 tracks_interactions/graph/__pycache__
+tracks_interactions/__pycache__/__init__.cpython-310.pyc
