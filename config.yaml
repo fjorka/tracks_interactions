@@ -1,0 +1,32 @@
+experiment_settings:
+  experiment_name: 2023_E6_exp
+  description: Cisplatin treated ovarian cancer cells. ch0 - DHB, ch1 - 53BP1
+
+signal_channels:
+  - name: ch0
+    path: D:\test_data\E6_C0_level_1.zarr
+    lut: green
+  - name: ch1
+    path: D:\test_data\E6_C1_level_1.zarr
+    lut: red
+
+database:
+  path: D:\test_data\Exp6_gardener_v6.db
+
+graphs:
+  - name: DHB
+    signals: 
+      - ch0_nuc
+      - ch0_cyto
+    colors:
+      - yellow
+      - green
+
+cell_tags:
+  modified: x
+  apoptosis: A
+  mitosis: M
+  disappear: D
+  test: T
+
+  
