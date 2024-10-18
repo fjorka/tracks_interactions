@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from ete3 import Tree
+import networkx as nx
 from pyqtgraph import (
     GraphicsLayoutWidget,
     TextItem,
@@ -163,162 +163,120 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         else:
             self.viewer.status = 'Error - no such label in the database.'
 
-    def render_tree_view(self, t):
+    def render_tree_view(self, G):
         """
-        Create a new family tree when the update is called.
+        Render the hierarchical tree using NetworkX and PyQtGraph, 
+        assuming node positions are stored in the 'pos' attribute of each node.
+        
+        G: NetworkX graph with node positions stored in 'pos' attributes.
         """
-
         y_max = 1
 
-        # render the tree
-        t_rendering = t.render('.')
+        # Iterate over nodes in the graph
+        for node in G.nodes():
+            if G.in_degree(node) == 0:  # Skip root for now
+                continue
 
-        # add position of y to the rendering
-        t = _add_y_rendering(t, t_rendering)
+            node_data = G.nodes[node]
+            node_name = node_data['name']
 
-        for n in t.traverse():
-            if n.is_root():
-                pass
+            # Get position in time (x-coordinates: start and stop)
+            x1 = node_data['start']
+            x2 = node_data['stop']
+            x_signal = [x1, x2]
+
+            # Get y-coordinate from the node's 'pos' attribute
+            y_signal = np.array([node_data['pos'][1]]).repeat(2)
+            y_max = np.max([y_signal[0], y_max])
+
+            # Get color based on the label
+            label_color = self.labels.get_color(node_name)
+
+            # Pen color and style adjustments based on the node's state
+            if node_name == self.active_label:
+                pen_color = mkColor((label_color * 255).astype(int))
+                pen = mkPen(color=pen_color, width=4)
             else:
-                node_name = n.name
+                label_color[-1] = 0.4
+                pen_color = mkColor((label_color * 255).astype(int))
+                pen = mkPen(color=pen_color, width=2)
 
-                # get position in time
-                x1 = n.start
-                x2 = n.stop
-                x_signal = [x1, x2]
+            if not node_data['accepted']:
+                pen.setStyle(Qt.DotLine)
 
-                # get rendered position (y axis)
-                y_signal = n.y.repeat(2)
-                y_max = np.max([n.y, y_max])
+            # Plot the horizontal line for the node
+            self.plot_view.plot(x_signal, y_signal, pen=pen)
 
-                label_color = self.labels.get_color(node_name)
+            # Add text label for the node
+            if node_data['accepted']:
+                text_item = TextItem(str(node_name), anchor=(1, 1), color='green')
+            else:
+                text_item = TextItem(str(node_name), anchor=(1, 1))
 
-                if n.name == self.active_label:
-                    pen_color = mkColor((label_color * 255).astype(int))
-                    pen = mkPen(color=pen_color, width=4)
-                else:
-                    label_color[-1] = 0.4
-                    pen_color = mkColor((label_color * 255).astype(int))
-                    pen = mkPen(color=pen_color, width=2)
+            text_item.setPos(x2, node_data['pos'][1])
+            self.plot_view.addItem(text_item)
 
-                if n.accepted is False:
-                    pen.setStyle(Qt.DotLine)
+            # Plot vertical lines to children
+            for child in G.successors(node):
+                child_data = G.nodes[child]
 
+                # Get vertical line (constant x and different y values)
+                x_signal = [x2, x2]
+                y_signal = [node_data['pos'][1], child_data['pos'][1]]
                 self.plot_view.plot(x_signal, y_signal, pen=pen)
 
-                # add text
-                if n.accepted is True:
-                    text_item = TextItem(
-                        str(node_name), anchor=(1, 1), color='green'
-                    )
-
-                else:
-                    text_item = TextItem(str(node_name), anchor=(1, 1))
-
-                text_item.setPos(x2, n.y)
-                self.plot_view.addItem(text_item)
-
-                # check if children are present
-                if len(n.children) > 0:
-                    for child in n.children:
-                        x_signal = [x2, x2]
-                        y_signal = [n.y, child.y]
-                        self.plot_view.plot(x_signal, y_signal, pen=pen)
-
-        # set limits on axis
+        # Set plot axis limits
         self.plot_view.setXRange(0, self.t_max)
         self.plot_view.setYRange(0, 1.1 * y_max)
 
-
-def _add_children(node, df, n=2):
+def _add_children(G, parent, df, n=2):
     """
-    Helper function for build_Newick_tree
-    Recursively adds children to the tree from a dataframe.
-    Modifies the tree in place.
-
-    input:
-        node - ete3.TreeNode
-        df - dataframe with info about children
-        n - number of the first child
-    output:
-        None
+    Recursively adds children to the NetworkX graph from a dataframe.
+    
+    G - NetworkX graph
+    parent - parent node ID
+    df - dataframe with information about children
+    n - counter for numbering nodes
     """
-
-    # get a df with the info about children
-    children = df.loc[df.parent_track_id == node.name, :]
+    children = df[df['parent_track_id'] == parent]
 
     for _, row in children.iterrows():
-        child_node = node.add_child(name=row['track_id'])
-        child_node.add_features(
-            num=n,
-            start=row['t_begin'],
-            stop=row['t_end'],
-            accepted=row['accepted_tag'],
-        )
+        child_id = row['track_id']
+        G.add_node(child_id, name=row['track_id'], start=row['t_begin'], stop=row['t_end'], accepted=row['accepted_tag'], num=n)
+        G.add_edge(parent, child_id)
 
         n += 1
-
-        n = _add_children(child_node, df, n)
+        n = _add_children(G, child_id, df, n)
 
     return n
 
-
-def _add_y_rendering(t, t_rendering):
-    """
-    Helper function for rendering of a tree.
-    For convenience to keep y values in the tree.
-    Helpful while generating vertical lines.
-    t -
-    t_rendering -
-    """
-
-    for n in t.traverse(strategy='preorder'):
-        if n.is_root():
-            pass
-        else:
-            y = np.mean(
-                [
-                    t_rendering['node_areas'][n.num][1],
-                    t_rendering['node_areas'][n.num][3],
-                ]
-            )
-            n.add_feature('y', y)
-
-    return t
-
-
 def build_Newick_tree(session, root_id):
     """
-    input:
-        - root_id
-        - session
-    output:
-        - Newick tree to construct a graph
+    Build a NetworkX graph to represent the hierarchical tree structure.
+    
+    session - database session
+    root_id - ID of the root node
     """
-
-    # get info about the family from the database
+    # Get info about the family from the database
     query = session.query(TrackDB).filter(TrackDB.root == root_id)
     df = pd.read_sql(query.statement, session.bind)
 
-    # make sure that the root of this id exists
+    # Ensure the root exists
     assert len(df) > 0, 'No data for this root_id'
 
-    # create tree
-    tree = Tree(name=root_id)
+    # Create a NetworkX graph
+    G = nx.DiGraph()
 
-    # add trunk
-    trunk_row = df.loc[df.track_id == root_id, :]
+    # Add the root (trunk) node
+    trunk_row = df[df['track_id'] == root_id]
+    G.add_node(root_id, name=root_id, start=trunk_row['t_begin'].values[0], stop=trunk_row['t_end'].values[0], accepted=bool(trunk_row['accepted_tag'].values[0]), num=1)
 
-    trunk = tree.add_child(name=root_id)
-    trunk.add_features(
-        num=1,
-        start=trunk_row['t_begin'].values[0],
-        stop=trunk_row['t_end'].values[0],
-        accepted=bool(trunk_row['accepted_tag'].values[0]),
-    )
+    # Recursively add children
+    _add_children(G, root_id, df)
 
-    # add children
-    _add_children(trunk, df)
+    # add rendering
+    pos = nx.spring_layout(G, seed=42)
+    nx.set_node_attributes(G, pos, 'pos')
 
-    # return tree
-    return tree
+    # Return the NetworkX graph
+    return G
