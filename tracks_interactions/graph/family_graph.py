@@ -171,11 +171,10 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         G: NetworkX graph with node positions stored in 'pos' attributes.
         """
         y_max = 1
+        y_min = 0
 
         # Iterate over nodes in the graph
         for node in G.nodes():
-            if G.in_degree(node) == 0:  # Skip root for now
-                continue
 
             node_data = G.nodes[node]
             node_name = node_data['name']
@@ -186,8 +185,9 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             x_signal = [x1, x2]
 
             # Get y-coordinate from the node's 'pos' attribute
-            y_signal = np.array([node_data['pos'][1]]).repeat(2)
+            y_signal = np.array([node_data['y']]).repeat(2)
             y_max = np.max([y_signal[0], y_max])
+            y_min = np.min([y_signal[0], y_min])
 
             # Get color based on the label
             label_color = self.labels.get_color(node_name)
@@ -213,7 +213,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             else:
                 text_item = TextItem(str(node_name), anchor=(1, 1))
 
-            text_item.setPos(x2, node_data['pos'][1])
+            text_item.setPos(x2, node_data['y'])
             self.plot_view.addItem(text_item)
 
             # Plot vertical lines to children
@@ -222,12 +222,53 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
                 # Get vertical line (constant x and different y values)
                 x_signal = [x2, x2]
-                y_signal = [node_data['pos'][1], child_data['pos'][1]]
+                y_signal = [node_data['y'], child_data['y']]
                 self.plot_view.plot(x_signal, y_signal, pen=pen)
 
         # Set plot axis limits
         self.plot_view.setXRange(0, self.t_max)
-        self.plot_view.setYRange(0, 1.1 * y_max)
+        self.plot_view.setYRange(y_min -0.1*abs(y_min), y_max + 0.1*abs(y_max))
+
+def reingold_tilford(tree, node=None, depth=0, x_offset=0, x_spacing=1):
+    """
+    Recursive function to apply Reingold-Tilford algorithm for binary trees.
+    
+    Args:
+        tree: NetworkX DiGraph representing the tree.
+        node: Current node being processed (if None, starts at the root).
+        depth: Current depth level in the tree.
+        x_offset: Horizontal position offset for the current node.
+        x_spacing: Spacing between nodes.
+    
+    Returns:
+        pos: Dictionary of node positions with x, y coordinates.
+    """
+    # If no node is specified, start from the root node (node with in-degree 0)
+    if node is None:
+        node = next(n for n in tree.nodes() if tree.in_degree(n) == 0)
+
+    if tree.out_degree(node) == 0:  # If leaf node
+        return {node: (x_offset, -depth)}
+    
+    children = list(tree.successors(node))
+    
+    # Get positions of left and right subtrees
+    pos_left = reingold_tilford(tree, children[0], depth+1, x_offset, x_spacing) if len(children) > 0 else {}
+    pos_right = reingold_tilford(tree, children[1], depth+1, x_offset + len(pos_left) * x_spacing, x_spacing) if len(children) > 1 else {}
+    
+    # Calculate the center x position of the current node
+    num_left = len(pos_left)
+    num_right = len(pos_right)
+    
+    # Center node between left and right children
+    x_center = x_offset + (num_left + num_right - 1) / 2.0 * x_spacing
+    pos = {node: (x_center, -depth)}
+    
+    # Merge positions of subtrees
+    pos.update(pos_left)
+    pos.update(pos_right)
+    
+    return pos
 
 def _add_children(G, parent, df, n=2):
     """
@@ -275,8 +316,9 @@ def build_Newick_tree(session, root_id):
     _add_children(G, root_id, df)
 
     # add rendering
-    pos = nx.spring_layout(G, seed=42)
-    nx.set_node_attributes(G, pos, 'pos')
+    pos = reingold_tilford(G)
+    y_values = {node: x for node, (x, y) in pos.items()}
+    nx.set_node_attributes(G, y_values, 'y')
 
     # Return the NetworkX graph
     return G
