@@ -699,3 +699,11 @@ def tag_cell(session, active_cell, frame, annotation):
         sts = f'Tag {annotation} was set to {not current_state}.'
 
     return sts
+
+
+def ring_intensity():
+    """
+    Function to calculate ring intensity.
+    """
+
+    pass

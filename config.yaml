@@ -10,6 +10,29 @@ signal_channels:
     path: D:\test_data\E6_C1_level_1.zarr
     lut: red
 
+cell_measurements:
+  - function: area
+    source: regionprops
+  - function: intensity_mean
+    name: nuc
+    source: regionprops
+    channels: 
+      - ch0
+      - ch1
+  - function: ring_intensity
+    name: cyto
+    source: track_gardener
+    channels: 
+      - ch0
+      - ch1
+    thickness: 5
+  - function: median_intensity
+    name: median
+    source: regionprops
+    channels: D:\test_data\custom_measurement.py
+      - ch0
+      - ch1
+
 database:
   path: D:\test_data\Exp6_gardener_v6.db
 

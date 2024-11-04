@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 import napari
 import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.widget.signal_graph_widget import CellGraphWidget
-
+from tracks_interactions.db.config_functions import testConfigFile
 
 class SettingsWidget(QWidget):
     def __init__(
@@ -105,10 +105,24 @@ class SettingsWidget(QWidget):
         )
         if fileName:
 
-            # load config content
-            self.loadConfigFile(fileName)
+            # test if the config file is correct
+            self.viewer.status = 'Checking the config file...'
+            status, msg = testConfigFile(fileName)
 
-            self.reorganizeWidgets()
+            if status:
+                # display a message
+                self.viewer.status = 'Config file is correct.'
+                
+                # load config content
+                self.loadConfigFile(fileName)
+                
+                self.reorganizeWidgets()
+            else:
+                # display a window with the error message
+                msgBox = QtWidgets.QMessageBox(self.viewer.window._qt_window)
+                msgBox.setText(msg)
+                msgBox.exec()
+
 
     def reorganizeWidgets(self):
         """
