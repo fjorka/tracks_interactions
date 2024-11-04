@@ -65,17 +65,24 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
             dist = float('inf')
             selected_n = None
 
-            if self.tree is not None:
-                for n in self.tree.traverse():
-                    if n.is_root():
-                        pass
-                    else:
-                        # self.viewer.status=f'Clicked on {n.name}, {y_val} of {n.y}, {x_val} from {n.start} to {n.stop}!'
-                        if (n.start <= x_val) and (n.stop >= x_val):
-                            dist_track = abs(n.y - y_val)
-                            if dist_track < dist:
-                                dist = dist_track
-                                selected_n = n
+            if self.tree is not None:  # self.tree is the NetworkX graph
+                for n in self.tree.nodes():
+                    # Get node data (attributes)
+                    node_data = self.tree.nodes[n]
+
+                    # Extract node attributes (e.g., start, stop, and y values)
+                    start = node_data.get('start')
+                    stop = node_data.get('stop')
+                    y_val_node = node_data.get('y') 
+
+                    # Check if the x_val falls within the start-stop range of the node
+                    if (start <= x_val) and (stop >= x_val):
+                        dist_track = abs(y_val_node - y_val)
+
+                        # Update the selected node if this node is closer to the clicked point
+                        if dist_track < dist:
+                            dist = dist_track
+                            selected_n = n
             ############################################################
 
             if event.button() == Qt.LeftButton:
@@ -84,8 +91,9 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
 
                 # capture if it tries to get attribute from None
                 try:
-                    self.viewer.status = f'Selected track: {selected_n.name}'
-                    self.labels.selected_label = selected_n.name
+                    node_selected = self.tree.nodes[selected_n]
+                    self.viewer.status = f'Selected track: {selected_n}'
+                    self.labels.selected_label = selected_n
 
                 except AttributeError:
                     print(
@@ -98,7 +106,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                     # flip the status
                     track = (
                         self.session.query(TrackDB)
-                        .filter(TrackDB.track_id == selected_n.name)
+                        .filter(TrackDB.track_id == selected_n)
                         .first()
                     )
                     track.accepted_tag = not track.accepted_tag
@@ -108,7 +116,7 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
                     self.update_lineage_display()
 
                     # update viewer status
-                    self.viewer.status = f'Track {selected_n.name} accepted status: {track.accepted_tag}.'
+                    self.viewer.status = f'Track {track.track_id} accepted status: {track.accepted_tag}.'
 
         else:
             self.viewer.status = 'No tree to select from.'
@@ -170,8 +178,8 @@ class FamilyGraphWidget(GraphicsLayoutWidget):
         
         G: NetworkX graph with node positions stored in 'pos' attributes.
         """
-        y_max = 1
-        y_min = 0
+        y_max = -0.1
+        y_min = 0.1
 
         # Iterate over nodes in the graph
         for node in G.nodes():
