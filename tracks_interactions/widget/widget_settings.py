@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 import napari
 import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.widget.signal_graph_widget import CellGraphWidget
-from tracks_interactions.db.config_functions import testConfigFile
+from tracks_interactions.db.config_functions import testConfigFile, build_signal_function
 
 class SettingsWidget(QWidget):
     def __init__(
@@ -123,7 +123,6 @@ class SettingsWidget(QWidget):
                 msgBox.setText(msg)
                 msgBox.exec()
 
-
     def reorganizeWidgets(self):
         """
         reorganize widgets
@@ -140,13 +139,6 @@ class SettingsWidget(QWidget):
 
         self.loadExperiment()
         self.loadTracking()
-
-        # display load experiment button
-        # pb = QPushButton('Save Settings')
-        # pb.clicked.connect(self.loadExperiment)
-        # self.mWidget.layout().addWidget(pb, self.widget_line, 0)
-        # self.added_widgets.append(pb)
-        # self.widget_line += 1
 
         # display load widgets button
         pb = QPushButton('Add graph')
@@ -175,6 +167,8 @@ class SettingsWidget(QWidget):
             self.labels_settings = config.get('labels_settings', {})
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
+
+            self.signal_function = build_signal_function(config)
 
     def load_zarr(self, channel_path):
         """
@@ -217,9 +211,6 @@ class SettingsWidget(QWidget):
         for ch in self.channels_list:
             channel_name = ch.get('name', 'Unnamed')
             channel_path = ch.get('path', '')
-            if '.zarr' not in channel_path:
-                self.viewer.status = 'Only zarr files are supported'
-                return
             channel_lut = ch.get('lut', 'green')
             channel_contrast_limits = ch.get('contrast_limits', [0, 4095])
 

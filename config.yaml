@@ -25,13 +25,7 @@ cell_measurements:
     channels: 
       - ch0
       - ch1
-    thickness: 5
-  - function: median_intensity
-    name: median
-    source: regionprops
-    channels: D:\test_data\custom_measurement.py
-      - ch0
-      - ch1
+    ring_width: 5
 
 database:
   path: D:\test_data\Exp6_gardener_v6.db
@@ -44,6 +38,12 @@ graphs:
     colors:
       - yellow
       - green
+  - name: ar
+    signals: 
+      - area
+    colors:
+      - yellow
+
 
 cell_tags:
   modified: x
