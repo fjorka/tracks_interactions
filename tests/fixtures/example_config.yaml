@@ -8,6 +8,10 @@ signal_channels:
     lut: green
     contrast_limits: [0, 4095]
 
+cell_measurements:
+  - function: area
+    source: regionprops
+
 labels_settings:
   brush_size: 20
 

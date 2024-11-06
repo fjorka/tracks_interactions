@@ -91,20 +91,20 @@ def test_adding_widgets(viewer, db_session):
     # test creating widgets
     ch_list = []
     ch_names = []
-    ring_width = 0
     signal_list = []
     graph_list = [{'signals': ['ch0_nuc'], 'colors': 'white'}]
     cell_tags = {}
+
 
     main_widget.create_widgets(
         viewer,
         db_session,
         ch_list=ch_list,
         ch_names=ch_names,
-        ring_width=ring_width,
         signal_list=signal_list,
         graph_list=graph_list,
         cell_tags=cell_tags,
+        signal_function=None,
     )
 
     assert (
@@ -128,7 +128,6 @@ def test_clearing_widgets(viewer, db_session):
     # test creating widgets
     ch_list = []
     ch_names = []
-    ring_width = 0
     signal_list = []
     graph_list = [{'signals': ['ch0_nuc'], 'colors': 'white'}]
     cell_tags = {}
@@ -138,10 +137,10 @@ def test_clearing_widgets(viewer, db_session):
         db_session,
         ch_list=ch_list,
         ch_names=ch_names,
-        ring_width=ring_width,
         signal_list=signal_list,
         graph_list=graph_list,
         cell_tags=cell_tags,
+        signal_function=None,
     )
 
     # assert that the widgets are added

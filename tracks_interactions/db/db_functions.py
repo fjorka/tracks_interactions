@@ -10,7 +10,6 @@ from skimage.morphology import binary_dilation, disk
 
 from tracks_interactions.db.db_model import CellDB, TrackDB
 
-
 def newTrack_number(session):
     """
     input:
@@ -521,8 +520,7 @@ def add_new_CellDB(
     cell,
     modified=True,
     ch_list=None,
-    ch_names=None,
-    ring_width=5,
+    signal_function=None,
 ):
     """
     Function to add a complete cell
@@ -531,9 +529,10 @@ def add_new_CellDB(
     cell_db = add_new_core_CellDB(session, current_frame, cell)
 
     # add signals to the cell
-    new_signals = calculate_cell_signals(
-        cell_db, ch_list=ch_list, ch_names=ch_names, ring_width=ring_width
-    )
+    if signal_function is not None:
+        new_signals = signal_function(cell,current_frame,ch_list)
+    else:
+        new_signals = {}
     cell_db.signals = new_signals
 
     # add modified tag to the cell
@@ -546,93 +545,6 @@ def add_new_CellDB(
 
     # deal with the tracks
     trackDB_after_cellDB(session, cell_db.track_id, current_frame)
-
-
-def calculate_cell_signals(cell, ch_list=None, ch_names=None, ring_width=5):
-    """
-    Function to calculate signals of a single cell.
-    If a single plane given, frame information of a cell is not used.
-    """
-
-    # caclulate cell area
-    mask = np.array(cell.mask)
-    area = mask.sum()
-
-    cell_dict = {'area': int(area)}
-
-    if ch_list is None:
-        return cell_dict
-
-    # create a ring mask
-    cyto_mask = resize(
-        mask,
-        np.array(mask.shape) + 2 * ring_width,
-        order=0,
-        anti_aliasing=False,
-    )
-    cell_in_cyto_mask = np.zeros_like(cyto_mask)
-    cell_in_cyto_mask[ring_width:-ring_width, ring_width:-ring_width] = (
-        cell.mask
-    )
-    cyto_mask[cell_in_cyto_mask] = 0
-
-    # check how to cut boxes
-
-    # calculate positions
-    r_start = cell.bbox_0 - ring_width
-    c_start = cell.bbox_1 - ring_width
-    r_paste_start = c_paste_start = 0
-
-    # account for edge cases
-    if r_start < 0:
-        r_paste_start = -r_start
-        r_start = 0
-    if c_start < 0:
-        c_paste_start = -c_start
-        c_start = 0
-
-    ch = ch_list[0]
-    if ch.ndim == 3:
-        r_end = np.min([ch.shape[1], cell.bbox_2 + ring_width])
-        c_end = np.min([ch.shape[2], cell.bbox_3 + ring_width])
-    else:
-        r_end = np.min([ch.shape[0], cell.bbox_2 + ring_width])
-        c_end = np.min([ch.shape[1], cell.bbox_3 + ring_width])
-
-    # get signals for all the channels
-    if ch_names is None:
-        ch_names = [f'ch{i}' for i in range(len(ch_list))]
-
-    for ch, ch_name in zip(ch_list, ch_names):
-        # create a box for the channel
-        ch_box = np.zeros_like(cyto_mask).astype(ch.dtype)
-
-        # get channel ring boxes
-        if ch.ndim == 3:
-            signal = ch[cell.t, r_start:r_end, c_start:c_end]
-        else:
-            signal = ch[r_start:r_end, c_start:c_end]
-
-        # paste the signal into the box
-        ch_box[
-            r_paste_start : (r_paste_start + signal.shape[0]),
-            c_paste_start : (c_paste_start + signal.shape[1]),
-        ] = signal
-
-        # calculate signals
-        ch_nuc = np.mean(ch_box[cell_in_cyto_mask])
-        ch_cyto = np.mean(ch_box[cyto_mask])
-
-        # compute if necessary
-        if type(ch_nuc) == da.core.Array:
-            ch_nuc = ch_nuc.compute()
-            ch_cyto = ch_cyto.compute()
-
-        # add to the dictionary
-        cell_dict[ch_name + '_nuc'] = ch_nuc
-        cell_dict[ch_name + '_cyto'] = ch_cyto
-
-    return cell_dict
 
 
 def get_track_note(session, active_label):
@@ -755,6 +667,9 @@ def ring_intensity(cell,t,ch_data_list,kwargs):
         # Compute the desired statistic (e.g., mean or sum)
         ring_signal_mean = signal_in_ring.mean()
 
+        if type(ring_signal_mean) == da.core.Array:
+            ring_signal_mean = ring_signal_mean.compute()
+
         signal_list.append(ring_signal_mean)
 
-    return [ring_mask, signal_list]
+    return signal_list

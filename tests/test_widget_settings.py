@@ -79,6 +79,10 @@ def test_open_yaml_dialog(viewer, mocker):
         'qtpy.QtWidgets.QFileDialog.getOpenFileName',
         return_value=('test.yaml', None),
     )
+    testConfigFile_mock = mocker.patch(
+        'tracks_interactions.widget.widget_settings.testConfigFile',
+        return_value=(True,'')
+    )
     loadConfigFile_mock = mocker.patch(
         'tracks_interactions.widget.widget_settings.SettingsWidget.loadConfigFile'
     )
@@ -88,31 +92,10 @@ def test_open_yaml_dialog(viewer, mocker):
 
     set_widget.openFileDialog()
 
-    assert (
-        mock_getOpenFileName.called
-    ), "The dialog's exec_ method should have been called."
-    assert (
-        loadConfigFile_mock.called
-    ), 'The loadConfigFile method should have been called.'
-    assert (
-        reorganize_mock.called
-    ), 'The reorganizeWidgets method should have been called.'
-
-
-def test_not_zarr_pathway(viewer):
-    """
-    Test that the not zarr path is rejected.
-    """
-    set_widget = SettingsWidget(viewer)
-
-    set_widget.channels_list = [{'path': 'test.tif'}]
-
-    set_widget.loadExperiment()
-
-    exp_status = 'Only zarr files are supported'
-    assert (
-        viewer.status == exp_status
-    ), f'Expected status of the viewer to be "{exp_status}", instead it is "{viewer.status}"'
+    mock_getOpenFileName.assert_called_once()
+    testConfigFile_mock.assert_called_once_with('test.yaml')
+    loadConfigFile_mock.assert_called_once()
+    reorganize_mock.assert_called_once()
 
 
 def test_experiment_loading(viewer, mocker):

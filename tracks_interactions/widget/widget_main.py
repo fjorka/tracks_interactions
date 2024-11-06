@@ -92,10 +92,10 @@ class TrackGardener(QWidget):
         session,
         ch_list,
         ch_names,
-        ring_width,
         signal_list,
         graph_list,
         cell_tags,
+        signal_function,
     ):
         """
         Callback to create widgets in the second tab.
@@ -119,8 +119,8 @@ class TrackGardener(QWidget):
             session,
             ch_list=ch_list,
             ch_names=ch_names,
-            ring_width=ring_width,
             tag_dictionary=cell_tags,
+            signal_function=signal_function,
         )
         self.tab2.layout().addWidget(self.modification_widget, 1, 0)
 

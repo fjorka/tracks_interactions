@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 import napari
 import tracks_interactions.db.db_functions as fdb
 from tracks_interactions.widget.signal_graph_widget import CellGraphWidget
-from tracks_interactions.db.config_functions import testConfigFile, build_signal_function
+from tracks_interactions.db.config_functions import testConfigFile, create_calculate_signals_function
 
 class SettingsWidget(QWidget):
     def __init__(
@@ -168,7 +168,7 @@ class SettingsWidget(QWidget):
             self.graphs_list = config.get('graphs', [])
             self.cell_tags = config.get('cell_tags', [])
 
-            self.signal_function = build_signal_function(config)
+            self.signal_function = create_calculate_signals_function(config)
 
     def load_zarr(self, channel_path):
         """
@@ -269,10 +269,10 @@ class SettingsWidget(QWidget):
                 self.session,
                 self.channels_data_list,
                 ch_names,
-                5,
                 self.signal_list,
                 self.graphs_list,
                 self.cell_tags,
+                self.signal_function,
             )
 
         self.viewer.status = 'Tracking loaded'

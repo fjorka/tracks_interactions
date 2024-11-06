@@ -25,8 +25,8 @@ class ModificationWidget(QWidget):
         sql_session,
         ch_list=None,
         ch_names=None,
-        ring_width=5,
         tag_dictionary=None,
+        signal_function=None,
     ):
         super().__init__()
         self.setLayout(QVBoxLayout())
@@ -41,7 +41,7 @@ class ModificationWidget(QWidget):
         self.session = sql_session
         self.ch_list = ch_list
         self.ch_names = ch_names
-        self.ring_width = ring_width
+        self.signal_function = signal_function
 
         mod_group = QGroupBox()
         mod_group.setLayout(QGridLayout())
@@ -676,6 +676,7 @@ class ModificationWidget(QWidget):
                         current_frame,
                         cell_label,
                         ch_list=self.ch_list,
+                        signal_function=self.signal_function,
                     )
 
                     refresh_status = True
@@ -690,6 +691,7 @@ class ModificationWidget(QWidget):
                     current_frame,
                     cell_label,
                     ch_list=self.ch_list,
+                    signal_function=self.signal_function,
                 )
 
                 refresh_status = True
