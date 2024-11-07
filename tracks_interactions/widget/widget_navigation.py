@@ -66,6 +66,12 @@ class TrackNavigationWidget(QWidget):
         Works on any layer.
         """
         if event.button == 2:
+
+            # fixed for the eraser behavior
+            switch = False
+            if viewer.layers['Labels'].mode == 'erase':
+                viewer.layers['Labels'].mode = 'pan_zoom'
+            
             # look up cursor position
             position = tuple([int(x) for x in self.viewer.cursor.position])
 
@@ -74,6 +80,7 @@ class TrackNavigationWidget(QWidget):
 
             # set track as active
             self.labels.selected_label = int(myTrackNum)
+
 
     #########################################################
     # labels_layer_update
